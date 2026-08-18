@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HeadInspect — массовая проверка Open Graph всего сайта</title>
+  <meta name="description" content="Проверьте Open Graph всего сайта по sitemap: ошибки, предупреждения, изображения, размеры, дубли и подробный отчёт.">
+  <meta name="theme-color" content="#0f172a">
+
+  <meta property="og:title" content="HeadInspect — массовая проверка Open Graph всего сайта">
+  <meta property="og:description" content="Введите адрес сайта один раз. HeadInspect найдёт sitemap и проверит Open Graph на всех страницах.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://headinspect.ru/">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#top" aria-label="HeadInspect — на главную">
+        <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
+        <span>HeadInspect</span>
+      </a>
+
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav">
+        <span class="sr-only">Открыть меню</span>
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav id="main-nav" class="main-nav" aria-label="Основная навигация">
+        <a href="#features">Возможности</a>
+        <a href="#how">Как работает</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">SITE-WIDE OPEN GRAPH AUDIT</div>
+          <h1>Проверьте Open Graph <span>всего сайта</span></h1>
+          <p class="hero-lead">
+            Введите адрес сайта один раз. HeadInspect найдёт sitemap, проверит страницы и покажет,
+            где остались ошибки, забытые изображения и спорные настройки.
+          </p>
+
+          <form id="audit-form" class="audit-form" novalidate>
+            <label class="sr-only" for="site-url">Адрес сайта</label>
+            <div class="url-field">
+              <span class="url-icon" aria-hidden="true">⌁</span>
+              <input id="site-url" name="site-url" type="url" inputmode="url"
+                     autocomplete="url" placeholder="https://example.ru" required>
+              <button class="primary-btn" type="submit">Проверить сайт</button>
+            </div>
+            <p id="form-error" class="form-error" role="alert" hidden></p>
+          </form>
+
+          <div class="hero-meta">
+            <span>✓ Бесплатно</span>
+            <span>✓ Без регистрации</span>
+            <span>✓ До 500 страниц</span>
+          </div>
+        </div>
+
+        <aside class="hero-panel" aria-label="Пример результата">
+          <div class="panel-toolbar">
+            <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>headinspect.ru/audit</span>
+          </div>
+          <div class="mini-report">
+            <div class="mini-top">
+              <div>
+                <span class="mini-label">Проверка завершена</span>
+                <strong>127 страниц</strong>
+              </div>
+              <span class="score">95%</span>
+            </div>
+            <div class="mini-stats">
+              <div class="mini-stat error"><b>2</b><span>ошибки</span></div>
+              <div class="mini-stat warning"><b>4</b><span>предупреждения</span></div>
+              <div class="mini-stat success"><b>121</b><span>OK</span></div>
+            </div>
+            <div class="mini-rows">
+              <div class="mini-row bad"><span>●</span><code>/contacts/</code><small>Нет og:image</small></div>
+              <div class="mini-row warn"><span>●</span><code>/about/</code><small>800×800</small></div>
+              <div class="mini-row good"><span>●</span><code>/</code><small>1200×630</small></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="audit-workspace" class="audit-workspace" hidden>
+      <div class="shell">
+        <div id="progress-card" class="progress-card">
+          <div class="section-kicker">АУДИТ</div>
+          <div class="progress-heading">
+            <div>
+              <h2>Проверяем <span id="audit-host">example.ru</span></h2>
+              <p>HeadInspect последовательно находит карту сайта и анализирует страницы.</p>
+            </div>
+            <strong id="progress-percent">0%</strong>
+          </div>
+
+          <div class="progress-track" aria-hidden="true">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+
+          <div class="progress-steps" aria-live="polite">
+            <div class="step" data-step="site"><span>○</span> Сайт доступен</div>
+            <div class="step" data-step="robots"><span>○</span> robots.txt найден</div>
+            <div class="step" data-step="sitemap"><span>○</span> sitemap найден</div>
+            <div class="step" data-step="urls"><span>○</span> найдено <b id="found-count">0</b> страниц</div>
+            <div class="step" data-step="scan"><span>○</span> проверено <b id="checked-count">0</b> из <b id="total-count">0</b></div>
+          </div>
+        </div>
+
+        <div id="results-card" class="results-card" hidden>
+          <div class="results-head">
+            <div>
+              <div class="section-kicker">РЕЗУЛЬТАТ</div>
+              <h2>Проверка завершена</h2>
+              <p><strong id="result-total">0</strong> страниц проверено</p>
+            </div>
+            <div class="results-actions">
+              <button id="download-btn" class="secondary-btn" type="button">Скачать Excel</button>
+              <button id="restart-btn" class="ghost-btn" type="button">Проверить заново</button>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <button class="summary-card error active-filter" data-filter="error" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-errors">0</strong>
+              <small>Ошибки</small>
+            </button>
+            <button class="summary-card warning" data-filter="warning" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-warnings">0</strong>
+              <small>Предупреждения</small>
+            </button>
+            <button class="summary-card success" data-filter="success" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-ok">0</strong>
+              <small>OK</small>
+            </button>
+            <button class="summary-card all" data-filter="all" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-all">0</strong>
+              <small>Все страницы</small>
+            </button>
+          </div>
+
+          <div class="table-toolbar">
+            <div class="filter-tabs" role="group" aria-label="Фильтр результатов">
+              <button class="filter-tab active" data-filter="all" type="button">Все <span id="tab-all">0</span></button>
+              <button class="filter-tab" data-filter="error" type="button">Ошибки <span id="tab-errors">0</span></button>
+              <button class="filter-tab" data-filter="warning" type="button">Предупреждения <span id="tab-warnings">0</span></button>
+              <button class="filter-tab" data-filter="success" type="button">OK <span id="tab-ok">0</span></button>
+            </div>
+            <div class="toolbar-note">Нажмите на строку, чтобы увидеть подробности</div>
+          </div>
+
+          <div class="result-table-wrap">
+            <table class="result-table">
+              <thead>
+                <tr>
+                  <th>Статус</th>
+                  <th>Страница</th>
+                  <th>OG</th>
+                  <th>Изображение</th>
+                  <th>Размер</th>
+                  <th>Вес</th>
+                  <th>Результат</th>
+                </tr>
+              </thead>
+              <tbody id="result-body"></tbody>
+            </table>
+          </div>
+
+          <div id="empty-state" class="empty-state" hidden>По этому фильтру ничего не найдено.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="content-section">
+      <div class="shell">
+        <div class="section-intro">
+          <div class="section-kicker">ВОЗМОЖНОСТИ</div>
+          <h2>Не отдельная страница. <span>Весь сайт.</span></h2>
+          <p>
+            HeadInspect задуман как рабочий инструмент после массовых обновлений:
+            быстро пройти по страницам и найти то, что легко пропустить вручную.
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="feature-num">01</span>
+            <h3>Open Graph</h3>
+            <p>Проверка og:title, og:description, og:url, og:type, og:image и связанных полей.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">02</span>
+            <h3>OG Images</h3>
+            <p>Доступность, реальные размеры, формат, вес файла и соответствие заявленным данным.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">03</span>
+            <h3>Sitemap</h3>
+            <p>Автоматический поиск карты сайта через robots.txt и поддержка sitemap-index.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">04</span>
+            <h3>Дубли</h3>
+            <p>Поиск одинаковых OG-изображений на разных страницах — полезно после редизайна.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">05</span>
+            <h3>Понятные ошибки</h3>
+            <p>Красный — ошибка, жёлтый — предупреждение, зелёный — всё в порядке.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">06</span>
+            <h3>Отчёт</h3>
+            <p>Результаты можно выгрузить и использовать как список задач для исправления сайта.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="content-section alt">
+      <div class="shell">
+        <div class="section-intro narrow">
+          <div class="section-kicker">КАК ЭТО РАБОТАЕТ</div>
+          <h2>Четыре шага вместо сотен ручных проверок</h2>
+        </div>
+
+        <ol class="steps-grid">
+          <li><span>1</span><div><h3>Введите сайт</h3><p>Достаточно адреса домена.</p></div></li>
+          <li><span>2</span><div><h3>Найдём sitemap</h3><p>Сначала robots.txt, затем карта сайта.</p></div></li>
+          <li><span>3</span><div><h3>Проверим страницы</h3><p>До 500 URL за один аудит.</p></div></li>
+          <li><span>4</span><div><h3>Исправьте проблемы</h3><p>Откройте нужную страницу или изображение прямо из отчёта.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="story-section">
+      <div class="shell story-card">
+        <div class="story-mark">“</div>
+        <div>
+          <div class="section-kicker">ЗАЧЕМ HEADINSPECT</div>
+          <h2>Одна забытая картинка на сотне страниц — уже достаточная причина.</h2>
+          <p>
+            После массового обновления десятки страниц могут выглядеть правильно, но на одной останется
+            старое или неправильное OG-изображение. Именно такие ошибки и должен находить HeadInspect:
+            не по одному URL, а сразу по всему сайту.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="content-section">
+      <div class="shell">
+        <div class="section-intro narrow">
+          <div class="section-kicker">FAQ</div>
+          <h2>Частые вопросы</h2>
+        </div>
+
+        <div class="faq-list">
+          <details>
+            <summary>Что такое Open Graph?</summary>
+            <p>Это набор метаданных страницы, которые помогают сервисам формировать карточку ссылки: заголовок, описание, изображение и другие данные.</p>
+          </details>
+          <details>
+            <summary>Где HeadInspect берёт список страниц?</summary>
+            <p>Сервис ищет robots.txt, читает указанные в нём sitemap и при необходимости обрабатывает sitemap-index.</p>
+          </details>
+          <details>
+            <summary>Что будет, если на сайте больше 500 страниц?</summary>
+            <p>В первой версии один аудит ограничен 500 страницами. HeadInspect покажет, сколько URL найдено и сколько будет проверено.</p>
+          </details>
+          <details>
+            <summary>HeadInspect что-нибудь меняет на сайте?</summary>
+            <p>Нет. Аудит только читает публично доступные страницы и метаданные.</p>
+          </details>
+          <details>
+            <summary>Нужно ли регистрироваться?</summary>
+            <p>Нет. Первая версия задумана без регистрации и личного кабинета.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="bottom-cta">
+      <div class="shell bottom-cta-inner">
+        <div>
+          <div class="section-kicker">HEADINSPECT</div>
+          <h2>Проверьте, ничего ли не забыто.</h2>
+        </div>
+        <a class="primary-btn link-btn" href="#top">Проверить сайт</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <div>
+        <a class="brand footer-brand" href="#top"><span class="brand-mark">&lt;/&gt;</span><span>HeadInspect</span></a>
+        <p>Массовая проверка технических данных сайта.</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+        <a href="https://t.me/headinspect" target="_blank" rel="noopener noreferrer">Telegram ↗</a>
+      </div>
+      <small>© 2026 HeadInspect</small>
+    </div>
+  </footer>
+
+  <template id="detail-template">
+    <tr class="detail-row">
+      <td colspan="7">
+        <div class="detail-panel">
+          <div class="detail-copy">
+            <div class="detail-title"></div>
+            <div class="meta-list"></div>
+            <div class="issue-box"></div>
+            <div class="detail-actions"></div>
+          </div>
+          <div class="preview-box">
+            <div class="preview-label">OG IMAGE PREVIEW</div>
+            <div class="preview-image"><span>1200 × 630</span></div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
