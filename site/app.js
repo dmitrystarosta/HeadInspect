@@ -351,6 +351,17 @@ $("#download-btn").addEventListener("click", () => {
   alert("В этой фронтенд-версии кнопка показана как часть интерфейса. Экспорт XLSX подключим вместе с backend.");
 });
 
+
+// FAQ accordion: keep at most one answer open at a time.
+$$(".faq-list details").forEach((detail) => {
+  detail.addEventListener("toggle", () => {
+    if (!detail.open) return;
+    $$(".faq-list details").forEach((other) => {
+      if (other !== detail && other.open) other.open = false;
+    });
+  });
+});
+
 const menuToggle = $(".menu-toggle");
 const nav = $(".main-nav");
 menuToggle.addEventListener("click", () => {
