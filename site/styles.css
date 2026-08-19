@@ -1081,3 +1081,18 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
     font-size: 12px;
   }
 }
+
+
+@media (max-width: 760px) {
+  .meta-value .length-hint.ok {
+    color: var(--success) !important;
+  }
+
+  .meta-value .length-hint.warn {
+    color: var(--warning) !important;
+  }
+
+  .meta-value .length-hint.bad {
+    color: var(--error) !important;
+  }
+}
