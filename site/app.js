@@ -243,7 +243,78 @@ async function startAudit(url) {
       const data = await apiFetch(`/api/audits/${currentJobId}/results`, {
         signal: pollAbortController.signal
       });
-      currentRows = (data.results || []).map(mapApiRow);
+      currentRows = sortRowsForDisplay((data.results || []).map(mapApiRow));
+      showResults(currentRows.length);
+      return;
+    }
+
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
+
+function sortRowsForDisplay(rows) {
+  const severityRank = { error: 0, warning: 1, success: 2 };
+
+  return [...rows].sort((a, b) => {
+    // The home page is always the most important row.
+    if (a.path === "/" && b.path !== "/") return -1;
+    if (b.path === "/" && a.path !== "/") return 1;
+
+    const severityDiff = (severityRank[a.status] ?? 9) - (severityRank[b.status] ?? 9);
+    if (severityDiff !== 0) return severityDiff;
+
+    return a.path.localeCompare(b.path, "ru", { numeric: true, sensitivity: "base" });
+  });
+}
+
+
+async function openExistingAudit(jobId, fallbackUrl = null) {
+  if (pollAbortController) pollAbortController.abort();
+  pollAbortController = new AbortController();
+
+  currentJobId = jobId;
+  workspace.hidden = false;
+  resultsCard.hidden = true;
+  progressCard.hidden = false;
+  resetSteps();
+  setProgress(0);
+
+  if (fallbackUrl) {
+    try {
+      const u = new URL(fallbackUrl);
+      input.value = u.href;
+      $("#audit-host").textContent = u.hostname;
+    } catch {}
+  }
+
+  workspace.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  while (true) {
+    if (pollAbortController.signal.aborted) return;
+
+    const status = await apiFetch(`/api/audits/${jobId}`, {
+      signal: pollAbortController.signal
+    });
+    updateProgressUi(status);
+
+    if (status.normalized_url) {
+      try {
+        const u = new URL(status.normalized_url);
+        input.value = u.href;
+        $("#audit-host").textContent = u.hostname;
+      } catch {}
+    }
+
+    if (status.status === "failed") {
+      throw new Error(status.error || "Не удалось выполнить аудит.");
+    }
+
+    if (status.status === "completed") {
+      const data = await apiFetch(`/api/audits/${jobId}/results`, {
+        signal: pollAbortController.signal
+      });
+      currentRows = sortRowsForDisplay((data.results || []).map(mapApiRow));
       showResults(currentRows.length);
       return;
     }
@@ -474,8 +545,22 @@ if (menuToggle && nav) {
 }
 
 
-const initialUrl = new URLSearchParams(window.location.search).get("url");
-if (form && input && initialUrl) {
+const initialParams = new URLSearchParams(window.location.search);
+const initialJob = initialParams.get("job");
+const initialUrl = initialParams.get("url");
+
+if (form && input && initialJob) {
+  if (initialUrl) input.value = initialUrl;
+  window.setTimeout(async () => {
+    try {
+      await openExistingAudit(initialJob, initialUrl);
+    } catch (error) {
+      workspace.hidden = true;
+      showFormError(error?.message || "Не удалось открыть результаты аудита.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, 0);
+} else if (form && input && initialUrl) {
   input.value = initialUrl;
   window.setTimeout(() => form.requestSubmit(), 0);
 }

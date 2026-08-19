@@ -114,7 +114,7 @@ function updateProgress(status) {
   }
 }
 
-function renderHomeResult(status, results) {
+function renderHomeResult(status, results, jobId) {
   const pages = results?.results || [];
   const errors = pages.reduce((sum, page) => sum + (page.errors?.length || 0), 0);
   const warnings = pages.reduce((sum, page) => sum + (page.warnings?.length || 0), 0);
@@ -146,7 +146,7 @@ function renderHomeResult(status, results) {
 
   // Передаём URL на специализированную страницу, чтобы его не пришлось вводить заново.
   if (link && status.normalized_url) {
-    link.href = `/open-graph/?url=${encodeURIComponent(status.normalized_url)}`;
+    link.href = `/open-graph/?job=${encodeURIComponent(jobId)}&url=${encodeURIComponent(status.normalized_url)}`;
     link.textContent = "Открыть подробный Open Graph-аудит";
   }
 
@@ -201,7 +201,7 @@ async function startAudit(url) {
       const results = await apiFetch(`/api/audits/${created.job_id}/results`, {
         signal: pollAbortController.signal
       });
-      renderHomeResult(status, results);
+      renderHomeResult(status, results, created.job_id);
       return;
     }
 
