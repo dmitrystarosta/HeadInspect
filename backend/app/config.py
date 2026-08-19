@@ -1,11 +1,11 @@
 import os
 
 APP_NAME = "HeadInspect API"
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 USER_AGENT = os.getenv(
     "HEADINSPECT_USER_AGENT",
-    "HeadInspectBot/0.2 (+https://headinspect.ru/)",
+    "HeadInspectBot/0.3 (+https://headinspect.ru/)",
 )
 
 CONNECT_TIMEOUT = 5.0
@@ -19,9 +19,20 @@ MAX_CONCURRENT_AUDITS = 1
 MAX_HTML_BYTES = 2 * 1024 * 1024
 MAX_SITEMAP_BYTES = 5 * 1024 * 1024
 MAX_ROBOTS_BYTES = 512 * 1024
+MAX_OG_IMAGE_BYTES = 6 * 1024 * 1024
 
 MAX_SITEMAP_DEPTH = 4
 MAX_SITEMAPS = 50
 
-# In-memory retention for v0.2. Jobs disappear on API container restart.
+# Conservative OG-image guidance for warnings.
+RECOMMENDED_OG_WIDTH = 1200
+RECOMMENDED_OG_HEIGHT = 630
+MIN_OG_WIDTH = 600
+MIN_OG_HEIGHT = 315
+WARN_OG_IMAGE_BYTES = 1 * 1024 * 1024
+
+# Pillow decompression-bomb protection.
+MAX_IMAGE_PIXELS = 40_000_000
+
+# v0.3 still stores jobs in memory.
 JOB_TTL_SECONDS = 60 * 60

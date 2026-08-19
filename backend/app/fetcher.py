@@ -41,7 +41,6 @@ async def safe_fetch(
         headers={"User-Agent": USER_AGENT, "Accept": "*/*"},
     ) as client:
         for redirect_no in range(MAX_REDIRECTS + 1):
-            # Re-resolve and validate before every hop.
             await resolve_and_validate_host(current)
 
             try:
@@ -64,6 +63,14 @@ async def safe_fetch(
                                 status_code=502,
                                 detail=f"Unexpected content type: {content_type}",
                             )
+
+                    content_length = response.headers.get("content-length")
+                    if content_length:
+                        try:
+                            if int(content_length) > max_bytes:
+                                raise HTTPException(status_code=502, detail="Remote response is too large")
+                        except ValueError:
+                            pass
 
                     chunks: list[bytes] = []
                     total = 0

@@ -1,16 +1,38 @@
-# HeadInspect backend v0.2
+# HeadInspect backend v0.3
 
-Фоновый job-based backend для массового аудита.
+Open Graph MVP, уже рассчитанный на публичное подключение после reverse proxy/rate limit.
 
-## API
+## Что проверяет OG
 
-### Health
+Для каждой страницы:
 
-```bash
-curl http://127.0.0.1:8000/health
-```
+- `og:title`
+- `og:description`
+- `og:url`
+- `og:type`
+- `og:image`
+- несколько `og:image`
+- доступность `og:image`
+- HTTP-статус картинки
+- Content-Type
+- реальный формат изображения
+- реальный вес
+- реальные ширина и высота
+- маленькое изображение
+- нестандартный размер относительно 1200×630
+- несовпадение `og:image:width/height` с фактическими размерами
 
-### Запустить аудит
+`og:image` скачивается тем же безопасным fetcher:
+- только HTTP/HTTPS;
+- только порты 80/443;
+- DNS/IP проверка;
+- блокировка private/local/link-local/reserved адресов;
+- повторная проверка каждого redirect;
+- максимум 6 MB на изображение.
+
+## Jobs API
+
+### Запуск
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/audits \
@@ -18,53 +40,22 @@ curl -X POST http://127.0.0.1:8000/api/audits \
   -d '{"url":"https://moskostumer.ru"}'
 ```
 
-Ответ:
-
-```json
-{
-  "job_id": "...",
-  "status": "queued",
-  "status_url": "/api/audits/... ",
-  "results_url": "/api/audits/.../results"
-}
-```
-
-### Прогресс
+### Статус
 
 ```bash
 curl http://127.0.0.1:8000/api/audits/JOB_ID
 ```
 
-Статусы:
-
-- `queued`
-- `discovering`
-- `running`
-- `completed`
-- `failed`
-
-### Частичные / финальные результаты
+### Результаты
 
 ```bash
 curl http://127.0.0.1:8000/api/audits/JOB_ID/results
 ```
 
-Результаты доступны уже во время `running`.
+## Ограничения
 
-## Ограничения v0.2
-
-- максимум 500 URL на аудит;
-- 4 страницы одновременно внутри одного аудита;
-- одновременно выполняется максимум 1 тяжёлый аудит;
-- остальные задания ждут в памяти;
-- завершённые задания хранятся 1 час;
-- при перезапуске контейнера jobs теряются.
-
-Это намеренный MVP. До публичного запуска ещё нужны:
-
-- persistent job store;
-- rate limit;
-- reverse proxy + HTTPS;
-- проверка OG images;
-- ограничение очереди;
-- экспорт XLSX.
+- до 500 страниц;
+- 4 страницы параллельно;
+- один тяжёлый аудит одновременно;
+- jobs пока хранятся в RAM и теряются при restart контейнера;
+- до публичного запуска добавить rate limiting и reverse proxy + HTTPS.

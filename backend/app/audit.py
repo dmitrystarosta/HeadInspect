@@ -47,7 +47,7 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
         except Exception:
             errors.append("Не удалось разобрать HTML")
 
-        og_data, og_errors, og_warnings = analyze_open_graph(parser.og)
+        og_data, og_errors, og_warnings = await analyze_open_graph(parser.og, result.url)
         errors.extend(og_errors)
         warnings.extend(og_warnings)
 

@@ -5,12 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import APP_NAME, APP_VERSION
 from .jobs import job_manager
-from .models import (
-    AuditCreateResponse,
-    AuditJobStatus,
-    AuditRequest,
-    AuditResultsResponse,
-)
+from .models import AuditCreateResponse, AuditJobStatus, AuditRequest, AuditResultsResponse
 
 app = FastAPI(
     title=APP_NAME,

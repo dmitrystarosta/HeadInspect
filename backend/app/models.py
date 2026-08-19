@@ -15,10 +15,19 @@ class OpenGraphData(BaseModel):
     description: str | None = None
     url: str | None = None
     type: str | None = None
+
     image: str | None = None
-    image_width: str | None = None
-    image_height: str | None = None
     image_count: int = 0
+    image_width_declared: str | None = None
+    image_height_declared: str | None = None
+
+    image_accessible: bool | None = None
+    image_status_code: int | None = None
+    image_content_type: str | None = None
+    image_format: str | None = None
+    image_bytes: int | None = None
+    image_width: int | None = None
+    image_height: int | None = None
 
 
 class PageResult(BaseModel):
