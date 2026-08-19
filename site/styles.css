@@ -818,6 +818,12 @@ img { max-width: 100%; }
     font-size: 17px;
   }
   .main-nav a:hover { background: #f8fafc; }
+  .main-nav .external-arrow {
+    display: inline-block;
+    margin-left: 5px;
+    transform: translateX(2px);
+    font-size: 0.82em;
+  }
 
   .hero { padding: 54px 0 54px; }
   .hero h1 { font-size: clamp(42px, 13vw, 62px); }
