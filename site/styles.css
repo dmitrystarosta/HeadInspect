@@ -700,7 +700,15 @@ img { max-width: 100%; }
   font-size: 17px;
 }
 .faq-list summary::-webkit-details-marker { display: none; }
-.faq-list summary::after { content: "+"; float: right; color: var(--accent); font-size: 22px; }
+.faq-list summary::after {
+  content: "+";
+  grid-column: 2;
+  justify-self: end;
+  align-self: start;
+  color: var(--accent);
+  font-size: 22px;
+  line-height: 1.2;
+}
 .faq-list details[open] summary::after { content: "−"; }
 .faq-list p {
   max-width: 800px;
@@ -799,6 +807,11 @@ img { max-width: 100%; }
 }
 
 @media (max-width: 760px) {
+  .faq-list summary {
+    grid-template-columns: minmax(0, 1fr) 32px;
+    column-gap: 12px;
+  }
+
   .shell { width: min(calc(100% - 44px), var(--shell)); }
   .header-inner { min-height: 64px; }
 
