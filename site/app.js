@@ -1,4 +1,4 @@
-const DEMO_ROWS = [
+const ISSUE_SEEDS = [
   {
     status: "error",
     path: "/contacts/",
@@ -7,8 +7,6 @@ const DEMO_ROWS = [
     size: "—",
     weight: "—",
     message: "Нет og:image",
-    pageUrl: "https://example.ru/contacts/",
-    imageUrl: "",
     details: {
       title: "Контакты — Example",
       description: "Контактная информация",
@@ -20,6 +18,24 @@ const DEMO_ROWS = [
     issueText: "Социальные сети и мессенджеры могут выбрать случайное изображение страницы или показать карточку без изображения. Добавьте og:image."
   },
   {
+    status: "error",
+    path: "/catalog/summer-collection/",
+    og: "Есть",
+    image: "Есть",
+    size: "—",
+    weight: "—",
+    message: "og:image недоступен",
+    details: {
+      title: "Летняя коллекция — Example",
+      description: "Каталог летней коллекции",
+      ogTitle: "Летняя коллекция",
+      ogDescription: "Новая летняя коллекция",
+      ogImage: "/media/og/summer-2026.jpg"
+    },
+    issueTitle: "OG image возвращает ошибку",
+    issueText: "URL изображения указан в разметке, но файл недоступен. Проверьте путь, редиректы и HTTP-статус изображения."
+  },
+  {
     status: "warning",
     path: "/about/",
     og: "Есть",
@@ -27,8 +43,6 @@ const DEMO_ROWS = [
     size: "800×800",
     weight: "320 KB",
     message: "Нестандартный размер",
-    pageUrl: "https://example.ru/about/",
-    imageUrl: "https://example.ru/img/about-og.jpg",
     details: {
       title: "О компании — Example",
       description: "Рассказываем о компании",
@@ -47,8 +61,6 @@ const DEMO_ROWS = [
     size: "1200×630",
     weight: "1.4 MB",
     message: "Тяжёлое изображение",
-    pageUrl: "https://example.ru/services/",
-    imageUrl: "https://example.ru/img/services-og.jpg",
     details: {
       title: "Услуги — Example",
       description: "Наши услуги",
@@ -60,46 +72,71 @@ const DEMO_ROWS = [
     issueText: "Это не критическая ошибка, но изображение стоит оптимизировать, чтобы уменьшить объём загрузки."
   },
   {
-    status: "success",
-    path: "/",
+    status: "warning",
+    path: "/blog/very-long-article-slug-about-site-redesign-and-open-graph/",
     og: "Есть",
     image: "Есть",
     size: "1200×630",
-    weight: "148 KB",
-    message: "OK",
-    pageUrl: "https://example.ru/",
-    imageUrl: "https://example.ru/img/og-main.jpg",
+    weight: "740 KB",
+    message: "Изображение можно облегчить",
     details: {
-      title: "Example — Главная",
-      description: "Пример сайта",
-      ogTitle: "Example",
-      ogDescription: "Пример корректного Open Graph",
-      ogImage: "/img/og-main.jpg"
+      title: "Большая статья — Example",
+      description: "Подробный материал",
+      ogTitle: "Большая статья — Example",
+      ogDescription: "Подробный материал о редизайне",
+      ogImage: "/img/article-og.jpg"
     },
-    issueTitle: "Критических замечаний нет",
-    issueText: "Основные Open Graph поля присутствуют, изображение доступно."
-  },
-  {
-    status: "success",
-    path: "/blog/",
-    og: "Есть",
-    image: "Есть",
-    size: "1200×630",
-    weight: "184 KB",
-    message: "OK",
-    pageUrl: "https://example.ru/blog/",
-    imageUrl: "https://example.ru/img/blog-og.jpg",
-    details: {
-      title: "Блог — Example",
-      description: "Статьи и новости",
-      ogTitle: "Блог — Example",
-      ogDescription: "Статьи и новости компании",
-      ogImage: "/img/blog-og.jpg"
-    },
-    issueTitle: "Критических замечаний нет",
-    issueText: "Основные Open Graph поля присутствуют, изображение доступно."
+    issueTitle: "Вес изображения выше рекомендуемого",
+    issueText: "Файл доступен и имеет правильный размер, но его можно дополнительно оптимизировать."
   }
 ];
+
+const OK_SEED = {
+  status: "success",
+  og: "Есть",
+  image: "Есть",
+  size: "1200×630",
+  weight: "148 KB",
+  message: "OK",
+  details: {
+    title: "Example — Страница",
+    description: "Пример страницы",
+    ogTitle: "Example",
+    ogDescription: "Корректный Open Graph",
+    ogImage: "/img/og-main.jpg"
+  },
+  issueTitle: "Критических замечаний нет",
+  issueText: "Основные Open Graph поля присутствуют, изображение доступно."
+};
+
+function buildDemoRows(origin) {
+  const errors = Array.from({length: 8}, (_, i) => {
+    const seed = ISSUE_SEEDS[i % 2];
+    const suffix = i < 2 ? "" : `issue-${String(i + 1).padStart(2, "0")}/`;
+    const path = i < 2 ? seed.path : `/section/${suffix}`;
+    return {...seed, path};
+  });
+
+  const warnings = Array.from({length: 27}, (_, i) => {
+    const seed = ISSUE_SEEDS[2 + (i % 3)];
+    const path = i < 3 ? seed.path : `/blog/post-${String(i + 1).padStart(3, "0")}/`;
+    return {...seed, path};
+  });
+
+  const ok = Array.from({length: 452}, (_, i) => ({
+    ...OK_SEED,
+    path: i === 0 ? "/" : `/page-${String(i + 1).padStart(3, "0")}/`,
+    weight: `${120 + (i % 90)} KB`
+  }));
+
+  return [...errors, ...warnings, ...ok].map(row => ({
+    ...row,
+    pageUrl: new URL(row.path, origin).href,
+    imageUrl: row.details.ogImage && row.details.ogImage !== "—"
+      ? new URL(row.details.ogImage, origin).href
+      : ""
+  }));
+}
 
 const $ = (selector, ctx = document) => ctx.querySelector(selector);
 const $$ = (selector, ctx = document) => [...ctx.querySelectorAll(selector)];
@@ -110,11 +147,13 @@ const formError = $("#form-error");
 const workspace = $("#audit-workspace");
 const progressCard = $("#progress-card");
 const resultsCard = $("#results-card");
-const resultBody = $("#result-body");
+const resultList = $("#result-list");
+const loadMoreBtn = $("#load-more-btn");
 const emptyState = $("#empty-state");
 
-let activeFilter = "all";
-let currentRows = DEMO_ROWS;
+let activeFilter = "problems";
+let currentRows = [];
+let visibleLimit = 50;
 
 function normalizeUrl(value) {
   let v = value.trim();
@@ -181,14 +220,14 @@ async function runDemoAudit(url) {
 
   setStep("urls", "active");
   await sleep(500);
-  const total = 127;
+  const total = 487;
   $("#found-count").textContent = total;
   $("#total-count").textContent = total;
   setStep("urls");
   setProgress(38);
 
   setStep("scan", "active");
-  for (const value of [8, 24, 43, 68, 91, 112, 127]) {
+  for (const value of [24, 81, 146, 233, 319, 411, 487]) {
     $("#checked-count").textContent = value;
     setProgress(38 + Math.round(value / total * 62));
     await sleep(230);
@@ -198,14 +237,10 @@ async function runDemoAudit(url) {
 
   await sleep(350);
 
-  // В прототипе выводим демонстрационные строки.
-  currentRows = DEMO_ROWS.map(row => ({
-    ...row,
-    pageUrl: new URL(row.path, url.origin).href,
-    imageUrl: row.imageUrl ? new URL(row.details.ogImage, url.origin).href : ""
-  }));
-
-  showResults(total);
+  // В прототипе имитируем крупный аудит: 487 страниц,
+  // чтобы интерфейс сразу был рассчитан на реальную нагрузку.
+  currentRows = buildDemoRows(url.origin);
+  showResults(currentRows.length);
 }
 
 function showResults(total) {
@@ -214,8 +249,8 @@ function showResults(total) {
 
   const errors = currentRows.filter(r => r.status === "error").length;
   const warnings = currentRows.filter(r => r.status === "warning").length;
-  // В демо считаем остальные страницы корректными, даже если не рендерим 127 строк.
-  const ok = total - errors - warnings;
+  const ok = currentRows.filter(r => r.status === "success").length;
+  const problems = errors + warnings;
 
   $("#result-total").textContent = total;
   $("#count-errors").textContent = errors;
@@ -223,13 +258,16 @@ function showResults(total) {
   $("#count-ok").textContent = ok;
   $("#count-all").textContent = total;
 
-  $("#tab-all").textContent = total;
+  $("#tab-problems").textContent = problems;
   $("#tab-errors").textContent = errors;
   $("#tab-warnings").textContent = warnings;
   $("#tab-ok").textContent = ok;
+  $("#tab-all").textContent = total;
 
-  activeFilter = "all";
-  $$(".filter-tab").forEach(b => b.classList.toggle("active", b.dataset.filter === "all"));
+  activeFilter = "problems";
+  visibleLimit = 50;
+  $$(".filter-tab").forEach(b => b.classList.toggle("active", b.dataset.filter === "problems"));
+  $$(".summary-card").forEach(b => b.classList.remove("active-filter"));
   renderRows();
   resultsCard.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -238,41 +276,58 @@ function statusLabel(status) {
   return status === "error" ? "Ошибка" : status === "warning" ? "Внимание" : "OK";
 }
 
-function renderRows() {
-  resultBody.innerHTML = "";
-  const rows = currentRows.filter(row => activeFilter === "all" || row.status === activeFilter);
-
-  emptyState.hidden = rows.length !== 0;
-
-  rows.forEach((row, idx) => {
-    const tr = document.createElement("tr");
-    tr.className = `result-row status-${row.status}`;
-    tr.dataset.index = currentRows.indexOf(row);
-    tr.innerHTML = `
-      <td data-label="Статус"><span class="result-status">${statusLabel(row.status)}</span></td>
-      <td data-label="Страница" class="page-cell">${row.path}</td>
-      <td data-label="OG">${row.og}</td>
-      <td data-label="Изображение">${row.image}</td>
-      <td data-label="Размер" class="muted-cell">${row.size}</td>
-      <td data-label="Вес" class="muted-cell">${row.weight}</td>
-      <td data-label="Результат" class="result-message">${row.message}</td>
-    `;
-    tr.addEventListener("click", () => toggleDetail(tr, row));
-    resultBody.appendChild(tr);
-  });
+function getFilteredRows() {
+  if (activeFilter === "problems") return currentRows.filter(row => row.status !== "success");
+  if (activeFilter === "all") return currentRows;
+  return currentRows.filter(row => row.status === activeFilter);
 }
 
-function toggleDetail(rowEl, row) {
-  const next = rowEl.nextElementSibling;
-  if (next?.classList.contains("detail-row")) {
-    next.remove();
-    return;
-  }
+function renderRows() {
+  resultList.innerHTML = "";
+  const rows = getFilteredRows();
+  const visibleRows = rows.slice(0, visibleLimit);
 
-  $$(".detail-row", resultBody).forEach(el => el.remove());
+  emptyState.hidden = rows.length !== 0;
+  loadMoreBtn.hidden = rows.length <= visibleLimit;
+
+  visibleRows.forEach((row) => {
+    const item = document.createElement("article");
+    item.className = `result-item status-${row.status}`;
+    item.innerHTML = `
+      <button class="result-item-main" type="button" aria-expanded="false">
+        <span class="result-dot" aria-hidden="true"></span>
+        <span class="result-path">${escapeHtml(row.path)}</span>
+        <span class="result-message">${escapeHtml(row.message)}</span>
+        <span class="result-chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div class="result-item-detail" hidden></div>
+    `;
+
+    const button = $(".result-item-main", item);
+    const detailHost = $(".result-item-detail", item);
+    button.addEventListener("click", () => toggleDetail(item, detailHost, row, button));
+    resultList.appendChild(item);
+  });
+
+  if (!loadMoreBtn.hidden) {
+    const remaining = rows.length - visibleLimit;
+    loadMoreBtn.textContent = `Показать ещё ${Math.min(50, remaining)} из ${remaining}`;
+  }
+}
+
+function toggleDetail(item, detailHost, row, button) {
+  const isOpen = !detailHost.hidden;
+
+  $$(".result-item-detail", resultList).forEach(el => {
+    el.hidden = true;
+    const parentButton = el.previousElementSibling;
+    if (parentButton) parentButton.setAttribute("aria-expanded", "false");
+    el.parentElement?.classList.remove("open");
+  });
+
+  if (isOpen) return;
 
   const tpl = $("#detail-template").content.cloneNode(true);
-  const detail = $(".detail-row", tpl);
   $(".detail-title", tpl).textContent = row.path;
 
   const meta = $(".meta-list", tpl);
@@ -298,7 +353,11 @@ function toggleDetail(rowEl, row) {
   if (row.size !== "—") $(".preview-image span", tpl).textContent = row.size;
   else $(".preview-box", tpl).hidden = true;
 
-  rowEl.after(tpl);
+  detailHost.innerHTML = "";
+  detailHost.appendChild(tpl);
+  detailHost.hidden = false;
+  item.classList.add("open");
+  button.setAttribute("aria-expanded", "true");
 }
 
 function escapeHtml(value) {
@@ -326,6 +385,7 @@ form.addEventListener("submit", async (event) => {
 $$(".filter-tab").forEach(btn => {
   btn.addEventListener("click", () => {
     activeFilter = btn.dataset.filter;
+    visibleLimit = 50;
     $$(".filter-tab").forEach(b => b.classList.toggle("active", b === btn));
     renderRows();
   });
@@ -335,10 +395,16 @@ $$(".summary-card").forEach(btn => {
   btn.addEventListener("click", () => {
     const filter = btn.dataset.filter;
     activeFilter = filter;
+    visibleLimit = 50;
     $$(".filter-tab").forEach(b => b.classList.toggle("active", b.dataset.filter === filter));
     renderRows();
     $(".table-toolbar").scrollIntoView({ behavior: "smooth", block: "start" });
   });
+});
+
+loadMoreBtn.addEventListener("click", () => {
+  visibleLimit += 50;
+  renderRows();
 });
 
 $("#restart-btn").addEventListener("click", () => {

@@ -158,32 +158,18 @@
 
           <div class="table-toolbar">
             <div class="filter-tabs" role="group" aria-label="Фильтр результатов">
-              <button class="filter-tab active" data-filter="all" type="button">Все <span id="tab-all">0</span></button>
+              <button class="filter-tab active" data-filter="problems" type="button">Проблемы <span id="tab-problems">0</span></button>
               <button class="filter-tab" data-filter="error" type="button">Ошибки <span id="tab-errors">0</span></button>
               <button class="filter-tab" data-filter="warning" type="button">Предупреждения <span id="tab-warnings">0</span></button>
               <button class="filter-tab" data-filter="success" type="button">OK <span id="tab-ok">0</span></button>
+              <button class="filter-tab" data-filter="all" type="button">Все <span id="tab-all">0</span></button>
             </div>
-            <div class="toolbar-note">Нажмите на строку, чтобы увидеть подробности</div>
+            <div class="toolbar-note">Нажмите на строку, чтобы раскрыть подробности</div>
           </div>
 
-          <div class="result-table-wrap">
-            <table class="result-table">
-              <thead>
-                <tr>
-                  <th>Статус</th>
-                  <th>Страница</th>
-                  <th>OG</th>
-                  <th>Изображение</th>
-                  <th>Размер</th>
-                  <th>Вес</th>
-                  <th>Результат</th>
-                </tr>
-              </thead>
-              <tbody id="result-body"></tbody>
-            </table>
-          </div>
-
+          <div id="result-list" class="result-list" aria-live="polite"></div>
           <div id="empty-state" class="empty-state" hidden>По этому фильтру ничего не найдено.</div>
+          <button id="load-more-btn" class="load-more-btn" type="button" hidden>Показать ещё</button>
         </div>
       </div>
     </section>
@@ -338,22 +324,18 @@
   </footer>
 
   <template id="detail-template">
-    <tr class="detail-row">
-      <td colspan="7">
-        <div class="detail-panel">
-          <div class="detail-copy">
-            <div class="detail-title"></div>
-            <div class="meta-list"></div>
-            <div class="issue-box"></div>
-            <div class="detail-actions"></div>
-          </div>
-          <div class="preview-box">
-            <div class="preview-label">OG IMAGE PREVIEW</div>
-            <div class="preview-image"><span>1200 × 630</span></div>
-          </div>
-        </div>
-      </td>
-    </tr>
+    <div class="detail-panel">
+      <div class="detail-copy">
+        <div class="detail-title"></div>
+        <div class="meta-list"></div>
+        <div class="issue-box"></div>
+        <div class="detail-actions"></div>
+      </div>
+      <div class="preview-box">
+        <div class="preview-label">OG IMAGE PREVIEW</div>
+        <div class="preview-image"><span>1200 × 630</span></div>
+      </div>
+    </div>
   </template>
 
   <script src="app.js"></script>
