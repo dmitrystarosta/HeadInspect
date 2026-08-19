@@ -1050,3 +1050,12 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
     line-height: 1.6;
   }
 }
+
+
+@media (max-width: 760px) {
+  /* Decorative browser-preview cards are useful on desktop,
+     but on phones they look too much like real audit results. */
+  .hero-panel {
+    display: none !important;
+  }
+}
