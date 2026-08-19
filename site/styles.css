@@ -586,10 +586,19 @@ img { max-width: 100%; }
   display: grid;
   grid-template-columns: 155px 1fr;
   gap: 16px;
-  color: #475569;
-  font-size: 12px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
 }
-.meta-item code { color: var(--ink); word-break: break-all; }
+.meta-item code {
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.55;
+  word-break: break-word;
+}
 
 .issue-box {
   margin-top: 16px;
@@ -1015,3 +1024,29 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
 .module-status.warning { background: var(--warning); }
 .module-status.success { background: var(--success); }
 .module-counts .module-ok { color: var(--success); }
+
+
+/* When a real home audit is running/completed, the illustrative dashboard
+   is moved below the real diagnostics so it cannot be mistaken for results. */
+.home-dashboard.audit-demo-below {
+  width: 100%;
+  max-width: none;
+  margin-top: 28px;
+  transform: none;
+  box-shadow: none;
+  border-color: #dbe3ef;
+}
+.home-dashboard.audit-demo-below .panel-toolbar {
+  background: #f8fafc;
+}
+
+@media (max-width: 760px) {
+  .meta-item {
+    font-size: 13px;
+  }
+  .meta-item code {
+    font-size: 14px;
+    font-weight: 750;
+    line-height: 1.6;
+  }
+}

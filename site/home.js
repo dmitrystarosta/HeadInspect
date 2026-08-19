@@ -14,6 +14,24 @@ const submitBtn = form ? $('button[type="submit"]', form) : null;
 
 let pollAbortController = null;
 
+
+const homeHeroGrid = $(".home-hero .hero-grid");
+const homeDashboard = $(".home-dashboard");
+
+function moveDashboardBelowResults() {
+  const shell = $("#home-audit-workspace .shell");
+  if (!shell || !homeDashboard) return;
+  homeDashboard.classList.add("audit-demo-below");
+  shell.appendChild(homeDashboard);
+}
+
+function restoreDashboardToHero() {
+  if (!homeHeroGrid || !homeDashboard) return;
+  homeDashboard.classList.remove("audit-demo-below");
+  homeHeroGrid.appendChild(homeDashboard);
+}
+
+
 function normalizeUrl(value) {
   let v = value.trim();
   if (!v) return null;
@@ -167,6 +185,7 @@ async function startAudit(url) {
   pollAbortController = new AbortController();
 
   workspace.hidden = false;
+  moveDashboardBelowResults();
   resultsCard.hidden = true;
   progressCard.hidden = false;
   resetSteps();
@@ -237,6 +256,7 @@ $("#home-restart-btn")?.addEventListener("click", () => {
   pollAbortController?.abort();
   workspace.hidden = true;
   resultsCard.hidden = true;
+  restoreDashboardToHero();
   input.focus();
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
