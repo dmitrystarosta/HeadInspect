@@ -406,24 +406,33 @@ function toggleDetail(item, detailHost, row, button) {
   const tpl = $("#detail-template").content.cloneNode(true);
   $(".detail-title", tpl).textContent = row.path;
 
+  const titleHint = lengthHint(row.details.title, 30, 60, "title");
+  const descriptionHint = lengthHint(row.details.description, 120, 160, "description");
+
   const entries = [
-    ["<title>", row.details.title],
-    ["description", row.details.description],
-    ["og:title", row.details.ogTitle],
-    ["og:description", row.details.ogDescription],
-    ["og:url", row.details.ogUrl],
-    ["og:type", row.details.ogType],
-    ["og:image", row.details.ogImage],
-    ["image HTTP", row.details.imageStatus],
-    ["image MIME", row.details.imageType],
-    ["image format", row.details.imageFormat],
-    ["image size", row.details.imageSize],
-    ["image weight", row.details.imageWeight]
+    { key: "<title>", value: row.details.title, hint: titleHint },
+    { key: "description", value: row.details.description, hint: descriptionHint },
+    { key: "og:title", value: row.details.ogTitle },
+    { key: "og:description", value: row.details.ogDescription },
+    { key: "og:url", value: row.details.ogUrl },
+    { key: "og:type", value: row.details.ogType },
+    { key: "og:image", value: row.details.ogImage },
+    { key: "image HTTP", value: row.details.imageStatus },
+    { key: "image MIME", value: row.details.imageType },
+    { key: "image format", value: row.details.imageFormat },
+    { key: "image size", value: row.details.imageSize },
+    { key: "image weight", value: row.details.imageWeight }
   ];
 
-  $(".meta-list", tpl).innerHTML = entries.map(([k, v]) =>
-    `<div class="meta-item"><span>${escapeHtml(k)}</span><code>${escapeHtml(v)}</code></div>`
-  ).join("");
+  $(".meta-list", tpl).innerHTML = entries.map(item => `
+    <div class="meta-item">
+      <span>${escapeHtml(item.key)}</span>
+      <div class="meta-value">
+        <code>${escapeHtml(item.value)}</code>
+        ${item.hint ? `<small class="length-hint ${item.hint.state}">${escapeHtml(item.hint.text)}</small>` : ""}
+      </div>
+    </div>
+  `).join("");
 
   $(".issue-box", tpl).innerHTML =
     `<strong>${escapeHtml(row.issueTitle)}</strong>${escapeHtml(row.issueText)}`;
@@ -445,6 +454,42 @@ function toggleDetail(item, detailHost, row, button) {
   detailHost.hidden = false;
   item.classList.add("open");
   button.setAttribute("aria-expanded", "true");
+}
+
+
+function lengthHint(value, min, max, label) {
+  if (!value || value === "—") {
+    return { text: "нет значения", state: "bad" };
+  }
+
+  const count = [...String(value)].length;
+
+  if (count < min) {
+    return {
+      text: `${count} ${pluralRu(count, "символ", "символа", "символов")} — короткий ${label}, ориентир ${min}–${max}`,
+      state: "warn"
+    };
+  }
+
+  if (count > max) {
+    return {
+      text: `${count} ${pluralRu(count, "символ", "символа", "символов")} — длинный ${label}, ориентир ${min}–${max}`,
+      state: "warn"
+    };
+  }
+
+  return {
+    text: `${count} ${pluralRu(count, "символ", "символа", "символов")} — нормальная длина`,
+    state: "ok"
+  };
+}
+
+function pluralRu(n, one, few, many) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
 }
 
 function escapeHtml(value) {

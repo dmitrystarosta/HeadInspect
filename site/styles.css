@@ -1059,3 +1059,25 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
     display: none !important;
   }
 }
+
+
+.meta-value {
+  min-width: 0;
+}
+.length-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.length-hint.ok { color: var(--success); }
+.length-hint.warn { color: var(--warning); }
+.length-hint.bad { color: var(--error); }
+
+@media (max-width: 760px) {
+  .length-hint {
+    margin-top: 7px;
+    font-size: 12px;
+  }
+}
