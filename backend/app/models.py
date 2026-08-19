@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
 
 class AuditRequest(BaseModel):
     url: str = Field(..., examples=["https://example.ru"])
+
 
 class OpenGraphData(BaseModel):
     title: str | None = None
@@ -13,22 +20,51 @@ class OpenGraphData(BaseModel):
     image_height: str | None = None
     image_count: int = 0
 
+
 class PageResult(BaseModel):
     url: str
     status_code: int | None = None
     title: str | None = None
     meta_description: str | None = None
-    open_graph: OpenGraphData
-    errors: list[str] = []
-    warnings: list[str] = []
+    open_graph: OpenGraphData = Field(default_factory=OpenGraphData)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
-class AuditResponse(BaseModel):
+
+JobStatus = Literal["queued", "discovering", "running", "completed", "failed"]
+
+
+class AuditCreateResponse(BaseModel):
+    job_id: str
+    status: JobStatus
+    status_url: str
+    results_url: str
+
+
+class AuditJobStatus(BaseModel):
+    job_id: str
+    status: JobStatus
     requested_url: str
-    normalized_url: str
-    robots_url: str
-    robots_found: bool
-    sitemap_urls: list[str]
-    discovered_urls: int
+    normalized_url: str | None = None
+    robots_url: str | None = None
+    robots_found: bool | None = None
+    sitemap_urls: list[str] = Field(default_factory=list)
+    discovered_urls: int = 0
+    checked_urls: int = 0
+    max_urls: int = 500
+    limited: bool = False
+    progress_percent: int = 0
+    errors_found: int = 0
+    warnings_found: int = 0
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error: str | None = None
+
+
+class AuditResultsResponse(BaseModel):
+    job_id: str
+    status: JobStatus
     checked_urls: int
-    limited: bool
-    results: list[PageResult]
+    discovered_urls: int
+    results: list[PageResult] = Field(default_factory=list)

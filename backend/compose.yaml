@@ -7,8 +7,8 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       HEADINSPECT_ENV: production
-      HEADINSPECT_USER_AGENT: "HeadInspectBot/0.1 (+https://headinspect.ru/)"
-    mem_limit: 384m
-    cpus: 0.75
+      HEADINSPECT_USER_AGENT: "HeadInspectBot/0.2 (+https://headinspect.ru/)"
+    mem_limit: 448m
+    cpus: 0.85
     security_opt:
       - no-new-privileges:true

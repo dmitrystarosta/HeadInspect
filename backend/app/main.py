@@ -1,20 +1,63 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from .audit import run_audit
-from .config import APP_NAME, APP_VERSION
-from .models import AuditRequest, AuditResponse
+from __future__ import annotations
 
-app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url="/docs",redoc_url=None)
-app.add_middleware(CORSMiddleware,
-    allow_origins=["https://headinspect.ru","https://www.headinspect.ru"],
-    allow_credentials=False,allow_methods=["GET","POST","OPTIONS"],allow_headers=["Content-Type"])
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .config import APP_NAME, APP_VERSION
+from .jobs import job_manager
+from .models import (
+    AuditCreateResponse,
+    AuditJobStatus,
+    AuditRequest,
+    AuditResultsResponse,
+)
+
+app = FastAPI(
+    title=APP_NAME,
+    version=APP_VERSION,
+    docs_url="/docs",
+    redoc_url=None,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://headinspect.ru",
+        "https://www.headinspect.ru",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
+
 
 @app.get("/health")
-async def health():
-    return {"status":"ok","service":"headinspect-api","version":APP_VERSION}
+async def health() -> dict[str, str]:
+    return {
+        "status": "ok",
+        "service": "headinspect-api",
+        "version": APP_VERSION,
+    }
 
-@app.post("/api/audit",response_model=AuditResponse)
-async def audit(payload: AuditRequest):
-    try: return await run_audit(payload.url)
-    except HTTPException: raise
-    except Exception as exc: raise HTTPException(status_code=500,detail="Audit failed") from exc
+
+@app.post("/api/audits", response_model=AuditCreateResponse, status_code=202)
+async def create_audit(payload: AuditRequest) -> AuditCreateResponse:
+    job = await job_manager.create(payload.url)
+    return AuditCreateResponse(
+        job_id=job.job_id,
+        status=job.status,
+        status_url=f"/api/audits/{job.job_id}",
+        results_url=f"/api/audits/{job.job_id}/results",
+    )
+
+
+@app.get("/api/audits/{job_id}", response_model=AuditJobStatus)
+async def audit_status(job_id: str) -> AuditJobStatus:
+    job = job_manager.get(job_id)
+    return job_manager.status_model(job)
+
+
+@app.get("/api/audits/{job_id}/results", response_model=AuditResultsResponse)
+async def audit_results(job_id: str) -> AuditResultsResponse:
+    job = job_manager.get(job_id)
+    return job_manager.results_model(job)

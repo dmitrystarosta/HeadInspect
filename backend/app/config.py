@@ -1,14 +1,27 @@
 import os
 
 APP_NAME = "HeadInspect API"
-APP_VERSION = "0.1.0"
-USER_AGENT = os.getenv("HEADINSPECT_USER_AGENT", "HeadInspectBot/0.1 (+https://headinspect.ru/)")
+APP_VERSION = "0.2.0"
+
+USER_AGENT = os.getenv(
+    "HEADINSPECT_USER_AGENT",
+    "HeadInspectBot/0.2 (+https://headinspect.ru/)",
+)
+
 CONNECT_TIMEOUT = 5.0
 READ_TIMEOUT = 10.0
 MAX_REDIRECTS = 5
-MAX_AUDIT_URLS = 20
+
+MAX_AUDIT_URLS = 500
+PAGE_CONCURRENCY = 4
+MAX_CONCURRENT_AUDITS = 1
+
 MAX_HTML_BYTES = 2 * 1024 * 1024
 MAX_SITEMAP_BYTES = 5 * 1024 * 1024
 MAX_ROBOTS_BYTES = 512 * 1024
+
 MAX_SITEMAP_DEPTH = 4
 MAX_SITEMAPS = 50
+
+# In-memory retention for v0.2. Jobs disappear on API container restart.
+JOB_TTL_SECONDS = 60 * 60
