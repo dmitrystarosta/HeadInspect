@@ -88,6 +88,15 @@ img { max-width: 100%; }
   letter-spacing: -.08em;
 }
 
+.brand-logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
 .main-nav {
   display: flex;
   align-items: center;
