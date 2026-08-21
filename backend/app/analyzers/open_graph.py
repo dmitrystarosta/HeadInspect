@@ -74,11 +74,20 @@ async def analyze_open_graph(
         errors.append(f"Некорректный og:image: {exc.detail}")
         return data, errors, warnings
 
+    image_headers = {
+        # A standards-compliant, honest crawler UA in the conventional Mozilla-compatible form.
+        # Some CDNs return an empty 204 response to very minimal/unknown bot requests.
+        "User-Agent": "Mozilla/5.0 (compatible; HeadInspectBot/0.3; +https://headinspect.ru/)",
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Referer": page_url,
+    }
+
     try:
         image_result = await safe_fetch(
             data.image,
             max_bytes=MAX_OG_IMAGE_BYTES,
             accepted_content_types=("image/", "application/octet-stream"),
+            request_headers=image_headers,
         )
     except HTTPException as exc:
         data.image_accessible = False
@@ -92,6 +101,18 @@ async def analyze_open_graph(
     if image_result.status_code >= 400:
         data.image_accessible = False
         errors.append(f"og:image возвращает HTTP {image_result.status_code}")
+        return data, errors, warnings
+
+    # A 2xx response is not enough for image analysis: e.g. some CDNs answer
+    # with 204 No Content. Treat an empty body as an inaccessible image for
+    # this crawler instead of passing zero bytes to Pillow and reporting a
+    # misleading "format/size" error.
+    if not image_result.content:
+        data.image_accessible = False
+        errors.append(
+            f"og:image вернул пустой ответ HTTP {image_result.status_code}; "
+            "изображение не удалось получить для анализа"
+        )
         return data, errors, warnings
 
     data.image_accessible = True

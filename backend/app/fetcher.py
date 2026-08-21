@@ -32,13 +32,18 @@ async def safe_fetch(
     *,
     max_bytes: int,
     accepted_content_types: tuple[str, ...] | None = None,
+    request_headers: dict[str, str] | None = None,
 ) -> FetchResult:
     current = normalize_public_url(url)
+
+    headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
+    if request_headers:
+        headers.update(request_headers)
 
     async with httpx.AsyncClient(
         timeout=_timeout(),
         follow_redirects=False,
-        headers={"User-Agent": USER_AGENT, "Accept": "*/*"},
+        headers=headers,
     ) as client:
         for redirect_no in range(MAX_REDIRECTS + 1):
             await resolve_and_validate_host(current)
