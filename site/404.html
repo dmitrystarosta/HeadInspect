@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 — Страница не найдена | HeadInspect</title>
+  <meta name="robots" content="noindex, follow">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .error-page {
+      min-height: 58vh;
+      display: grid;
+      place-items: center;
+      padding: 64px 20px 80px;
+      text-align: center;
+    }
+    .error-box { max-width: 680px; margin: 0 auto; }
+    .error-code {
+      margin: 0 0 12px;
+      font-size: clamp(72px, 18vw, 150px);
+      line-height: .9;
+      letter-spacing: -.06em;
+      font-weight: 800;
+      color: var(--text, #111827);
+    }
+    .error-box h1 { margin: 0 0 14px; }
+    .error-box p {
+      max-width: 560px;
+      margin: 0 auto 28px;
+      color: var(--muted, #5f6368);
+      font-size: 18px;
+      line-height: 1.6;
+    }
+    .error-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+    .error-home {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 22px;
+      border-radius: 10px;
+      background: #1a73e8;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .error-home:hover { background: #1765cc; }
+    .error-links {
+      margin-top: 30px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 18px;
+      font-size: 14px;
+    }
+    .error-links a { color: #1a73e8; }
+  </style>
+</head>
+<body>
+<header class="site-header"><div class="shell header-inner">
+  <a class="brand" href="/" aria-label="HeadInspect — на главную"><img class="brand-logo" src="headinspect-logo.png" width="36" height="36" alt="" aria-hidden="true"><span>HeadInspect</span></a>
+  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"><span class="sr-only">Открыть меню</span><span></span><span></span><span></span></button>
+  <nav id="main-nav" class="main-nav tools-nav" aria-label="Инструменты HeadInspect">
+        <a href="/open-graph/">Open Graph</a>
+        <a href="/meta/">Meta <span class="nav-soon">скоро</span></a>
+        <a href="/canonical/">Canonical <span class="nav-soon">скоро</span></a>
+        <a href="/schema/">Schema <span class="nav-soon">скоро</span></a>
+        <a href="/sitemap/">Sitemap <span class="nav-soon">скоро</span></a>
+        <a href="https://github.com/dmitrystarosta/HeadInspect" target="_blank" rel="noopener noreferrer">GitHub <span class="external-arrow" aria-hidden="true">↗</span></a>
+      </nav>
+</div></header>
+
+<main class="error-page">
+  <section class="error-box" aria-labelledby="error-title">
+    <div class="error-code" aria-hidden="true">404</div>
+    <h1 id="error-title">Страница не найдена</h1>
+    <p>Возможно, адрес введён с ошибкой или страница была перемещена. Вернитесь на главную или выберите один из инструментов HeadInspect.</p>
+    <div class="error-actions">
+      <a class="error-home" href="/">На главную</a>
+    </div>
+    <nav class="error-links" aria-label="Инструменты HeadInspect">
+      <a href="/open-graph/">Open Graph</a>
+      <a href="/meta/">Meta</a>
+      <a href="/canonical/">Canonical</a>
+      <a href="/schema/">Schema</a>
+      <a href="/images/">Images</a>
+      <a href="/sitemap/">Sitemap</a>
+    </nav>
+  </section>
+</main>
+
+<footer class="site-footer">
+    <div class="shell footer-inner">
+      <div class="footer-main">
+        <div>
+          <a class="brand footer-brand" href="/"><img class="brand-logo" src="headinspect-logo.png" width="36" height="36" alt=""><span>HeadInspect</span></a>
+          <p>Массовая проверка технических данных сайта.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/open-graph/">Open Graph</a>
+          <a href="/meta/">Meta</a>
+          <a href="/canonical/">Canonical</a>
+          <a href="/schema/">Schema</a>
+          <a href="/sitemap/">Sitemap</a>
+          <a href="https://github.com/dmitrystarosta/HeadInspect" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+          <a href="https://t.me/headinspect" target="_blank" rel="noopener noreferrer">Telegram ↗</a>
+        </div>
+      </div>
+      <aside class="other-projects" aria-label="Другие проекты">
+        <div class="other-projects-label">Другие проекты</div>
+        <a class="project-card" href="https://belyjspisok.ru/" target="_blank" rel="noopener noreferrer">
+          <img src="belyjspisok-logo.png" width="56" height="56" alt="Логотип «Белый список?»">
+          <span class="project-card-copy"><strong>Белый список?</strong><small>Проверка доступности сайтов при ограничениях мобильного интернета.</small><span class="project-url">belyjspisok.ru ↗</span></span>
+        </a>
+      </aside>
+      <small class="copyright">© 2026 Dmitry Starosta</small>
+    </div>
+  </footer>
+<script src="/shell.js"></script>
+</body>
+</html>
