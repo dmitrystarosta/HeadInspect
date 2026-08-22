@@ -782,12 +782,12 @@ img { max-width: 100%; }
 }
 .footer-main { display: grid; gap: 24px; }
 .footer-brand .brand-mark { background: #e2e8f0; color: #0b1120; }
-.footer-inner p { color: #94a3b8; margin: 10px 0 0; font-size: 13px; }
+.footer-inner p { color: #a8b3c5; margin: 10px 0 0; font-size: 13px; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 18px; font-weight: 750; font-size: 13px; }
 
 .other-projects-label {
   margin-bottom: 10px;
-  color: #64748b;
+  color: #718096;
   font-size: 10px;
   font-weight: 850;
   letter-spacing: .12em;
@@ -835,7 +835,7 @@ img { max-width: 100%; }
 }
 .copyright {
   grid-column: 1 / -1;
-  color: #64748b;
+  color: #718096;
   border-top: 1px solid #1e293b;
   padding-top: 22px;
 }
@@ -988,7 +988,7 @@ img { max-width: 100%; }
 .tool-card.live { border-color:#bfd4ff; background:linear-gradient(180deg,#fff 0,#f7faff 100%); }
 .tool-card-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .tool-code { display:grid; place-items:center; min-width:42px; height:42px; padding:0 8px; border-radius:11px; background:var(--ink); color:#fff; font:800 11px ui-monospace,SFMono-Regular,Menlo,monospace; }
-.tool-badge { display:inline-flex; align-items:center; width:max-content; padding:5px 8px; border-radius:999px; background:#f1f5f9; color:#64748b; font-size:9px; font-weight:850; text-transform:uppercase; letter-spacing:.05em; }
+.tool-badge { display:inline-flex; align-items:center; width:max-content; padding:5px 8px; border-radius:999px; background:#f1f5f9; color:#5f6f82; font-size:9px; font-weight:850; text-transform:uppercase; letter-spacing:.05em; }
 .tool-badge.live { background:var(--success-bg); color:var(--success); }.tool-badge.big { margin:16px 0 -4px; font-size:10px; padding:6px 10px; }
 .tool-card h3 { margin:34px 0 9px; font-size:22px; letter-spacing:-.03em; }.tool-card p { color:var(--muted); font-size:13px; }.tool-link { display:block; margin-top:24px; color:var(--accent); font-size:12px; font-weight:800; }
 .audit-modules { display:grid; gap:10px; margin-top:30px; }
