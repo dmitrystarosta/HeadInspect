@@ -10,6 +10,7 @@
             <img class="brand-logo" src="/headinspect-logo-36.webp" srcset="/headinspect-logo-36.webp 1x, /headinspect-logo-72.webp 2x" width="36" height="36" alt="" aria-hidden="true">
             <span>HeadInspect</span>
           </a>
+          <p>Массовая проверка технических данных сайта.</p>
         </div>
         <div class="footer-links">
           <a href="/open-graph/">Open Graph</a>
