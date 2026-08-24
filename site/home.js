@@ -14,21 +14,12 @@ const submitBtn = form ? $('button[type="submit"]', form) : null;
 
 let pollAbortController = null;
 
-
-const homeHeroGrid = $(".home-hero .hero-grid");
-const homeDashboard = $(".home-dashboard");
-
-function moveDashboardBelowResults() {
-  const shell = $("#home-audit-workspace .shell");
-  if (!shell || !homeDashboard) return;
-  homeDashboard.classList.add("audit-demo-below");
-  shell.appendChild(homeDashboard);
-}
-
-function restoreDashboardToHero() {
-  if (!homeHeroGrid || !homeDashboard) return;
-  homeDashboard.classList.remove("audit-demo-below");
-  homeHeroGrid.appendChild(homeDashboard);
+function setHomeAuditUrl(jobId, urlValue) {
+  const params = new URLSearchParams();
+  if (jobId) params.set("job", jobId);
+  if (urlValue) params.set("url", urlValue);
+  const query = params.toString();
+  window.history.replaceState({}, "", query ? `/?${query}` : "/");
 }
 
 
@@ -213,7 +204,6 @@ async function startAudit(url) {
   pollAbortController = new AbortController();
 
   workspace.hidden = false;
-  moveDashboardBelowResults();
   resultsCard.hidden = true;
   progressCard.hidden = false;
   resetSteps();
@@ -230,6 +220,7 @@ async function startAudit(url) {
     body: JSON.stringify({ url: url.href }),
     signal: pollAbortController.signal
   });
+  setHomeAuditUrl(created.job_id, url.href);
   setSubmitting(false);
 
   while (true) {
@@ -249,6 +240,59 @@ async function startAudit(url) {
         signal: pollAbortController.signal
       });
       renderHomeResult(status, results, created.job_id);
+      return;
+    }
+
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
+async function openExistingHomeAudit(jobId, fallbackUrl = null) {
+  if (pollAbortController) pollAbortController.abort();
+  pollAbortController = new AbortController();
+
+  workspace.hidden = false;
+  resultsCard.hidden = true;
+  progressCard.hidden = false;
+  resetSteps();
+  setProgress(0);
+
+  if (fallbackUrl) {
+    input.value = fallbackUrl;
+    try {
+      const u = new URL(fallbackUrl);
+      $("#home-audit-host").textContent = u.hostname;
+    } catch {}
+  }
+
+  workspace.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  while (true) {
+    if (pollAbortController.signal.aborted) return;
+
+    const status = await apiFetch(`/api/audits/${jobId}`, {
+      signal: pollAbortController.signal
+    });
+    updateProgress(status);
+
+    if (status.normalized_url) {
+      input.value = status.normalized_url;
+      setHomeAuditUrl(jobId, status.normalized_url);
+      try {
+        const u = new URL(status.normalized_url);
+        $("#home-audit-host").textContent = u.hostname;
+      } catch {}
+    }
+
+    if (status.status === "failed") {
+      throw new Error(status.error || "Не удалось выполнить аудит.");
+    }
+
+    if (status.status === "completed") {
+      const results = await apiFetch(`/api/audits/${jobId}/results`, {
+        signal: pollAbortController.signal
+      });
+      renderHomeResult(status, results, jobId);
       return;
     }
 
@@ -284,7 +328,7 @@ $("#home-restart-btn")?.addEventListener("click", () => {
   pollAbortController?.abort();
   workspace.hidden = true;
   resultsCard.hidden = true;
-  restoreDashboardToHero();
+  setHomeAuditUrl(null, null);
   input.focus();
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
@@ -325,4 +369,23 @@ if (menuToggle && nav) {
     nav.classList.remove("open");
     menuToggle.setAttribute("aria-expanded", "false");
   }));
+}
+
+const initialParams = new URLSearchParams(window.location.search);
+const initialJob = initialParams.get("job");
+const initialUrl = initialParams.get("url");
+
+if (form && input && initialJob) {
+  if (initialUrl) input.value = initialUrl;
+  window.setTimeout(async () => {
+    try {
+      await openExistingHomeAudit(initialJob, initialUrl);
+    } catch (error) {
+      workspace.hidden = true;
+          showError(error?.message || "Не удалось открыть результаты общего аудита.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, 0);
+} else if (form && input && initialUrl) {
+  input.value = initialUrl;
 }

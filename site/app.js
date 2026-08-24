@@ -21,6 +21,27 @@ let visibleLimit = 50;
 let currentJobId = null;
 let pollAbortController = null;
 
+function setAuditContext(jobId, urlValue) {
+  if (!jobId) return;
+  const params = new URLSearchParams({ job: jobId });
+  if (urlValue) params.set("url", urlValue);
+  const query = params.toString();
+  const currentPath = window.location.pathname;
+  window.history.replaceState({}, "", `${currentPath}?${query}`);
+
+  const supportedPaths = new Set(["/", "/open-graph/", "/meta/"]);
+  $$(".cross-tool-links a, .main-nav a").forEach(link => {
+    const path = new URL(link.href, window.location.origin).pathname;
+    if (supportedPaths.has(path)) {
+      link.href = `${path}?${query}`;
+    }
+  });
+}
+
+function clearAuditContext() {
+  window.history.replaceState({}, "", window.location.pathname);
+}
+
 function normalizeUrl(value) {
   let v = value.trim();
   if (!v) return null;
@@ -225,6 +246,7 @@ async function startAudit(url) {
   });
 
   currentJobId = created.job_id;
+  setAuditContext(currentJobId, url.href);
   setSubmitting(false);
 
   while (true) {
@@ -274,6 +296,7 @@ async function openExistingAudit(jobId, fallbackUrl = null) {
   pollAbortController = new AbortController();
 
   currentJobId = jobId;
+  setAuditContext(jobId, fallbackUrl);
   workspace.hidden = false;
   resultsCard.hidden = true;
   progressCard.hidden = false;
@@ -285,6 +308,7 @@ async function openExistingAudit(jobId, fallbackUrl = null) {
       const u = new URL(fallbackUrl);
       input.value = u.href;
       $("#audit-host").textContent = u.hostname;
+      setAuditContext(jobId, u.href);
     } catch {}
   }
 
@@ -557,6 +581,7 @@ loadMoreBtn?.addEventListener("click", () => {
 $("#restart-btn")?.addEventListener("click", () => {
   if (pollAbortController) pollAbortController.abort();
   currentJobId = null;
+  clearAuditContext();
   workspace.hidden = true;
   input.focus();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -596,6 +621,7 @@ const initialUrl = initialParams.get("url");
 
 if (form && input && initialJob) {
   if (initialUrl) input.value = initialUrl;
+  setAuditContext(initialJob, initialUrl);
   window.setTimeout(async () => {
     try {
       await openExistingAudit(initialJob, initialUrl);
