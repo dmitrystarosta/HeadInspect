@@ -1,55 +1,42 @@
-HeadInspect
+# HeadInspect
 
-  HeadInspect — бесплатный русскоязычный сервис массовой технической
-  проверки сайтов. Сервис работает без регистрации и без ограничений на
-  количество проверок. Пользователь вводит адрес сайта один раз, после
-  чего HeadInspect находит страницы и проверяет доступные технические
-  модули сразу по всему сайту.
+> HeadInspect — бесплатный русскоязычный сервис массовой технической проверки сайтов. Работает без регистрации и без ограничений на количество проверок: пользователь один раз вводит адрес сайта, после чего HeadInspect находит страницы и проверяет доступные технические модули сразу по всему сайту.
 
-Основной сайт
+## Основной сайт
 
--   https://headinspect.ru/ Бесплатный общий аудит сайта. Один запуск
-    используется для всех доступных модулей.
+- [Общий аудит сайта](https://headinspect.ru/): бесплатный общий аудит сайта. Один запуск используется для всех доступных модулей.
 
-Доступные инструменты
+## Доступные инструменты
 
--   https://headinspect.ru/open-graph/ Бесплатная массовая проверка Open
-    Graph: og:title, og:description, og:url, og:type, og:image,
-    доступность и параметры изображений.
+- [Проверка Open Graph](https://headinspect.ru/open-graph/): массовая проверка og:title, og:description, og:url, og:type, og:image, доступности и параметров изображений.
+- [Проверка Meta](https://headinspect.ru/meta/): массовая проверка title, meta description, meta keywords, meta robots, viewport, lang, charset, длины значений и дублей между страницами.
 
--   https://headinspect.ru/meta/ Бесплатная массовая проверка Meta:
-    title, meta description, meta keywords, meta robots, viewport, lang,
-    charset, длина значений и дубли между страницами.
+## Документы
 
-Будущие инструменты
+- [Политика конфиденциальности](https://headinspect.ru/privacy/): политика обработки персональных данных.
 
--   https://headinspect.ru/canonical/ Проверка canonical URL.
+## Условия использования
 
--   https://headinspect.ru/schema/ Проверка Schema.org и JSON-LD.
+- HeadInspect бесплатен.
+- Регистрация не требуется.
+- Количество запусков проверки не ограничено.
+- Один аудит сайта проверяет до 500 страниц.
+- HeadInspect анализирует только публично доступные данные страниц.
+- Сервис не изменяет проверяемые сайты.
 
--   https://headinspect.ru/images/ Проверка изображений, alt, размеров и
-    форматов.
+## Контакты
 
--   https://headinspect.ru/sitemap/ Проверка sitemap и структуры URL.
+- [Сайт](https://headinspect.ru/)
+- [Email](mailto:headinspect@starosta.ru)
+- [GitHub](https://github.com/dmitrystarosta/HeadInspect)
+- [Telegram](https://t.me/headinspect)
+- [ВКонтакте](https://vk.ru/headinspect)
 
-Документы
+## Optional
 
--   https://headinspect.ru/privacy/ Политика обработки персональных
-    данных.
+Инструменты в разработке. Страницы уже доступны и содержат описание, но сама проверка пока не запущена.
 
-Условия использования
-
--   HeadInspect бесплатен.
--   Регистрация не требуется.
--   Количество запусков проверки не ограничено.
--   Один аудит сайта проверяет до 500 страниц.
--   HeadInspect анализирует только публично доступные данные страниц.
--   Сервис не изменяет проверяемые сайты.
-
-Контакты
-
--   Сайт: https://headinspect.ru/
--   Email: headinspect@starosta.ru
--   GitHub: https://github.com/dmitrystarosta/HeadInspect
--   Telegram: https://t.me/headinspect
--   ВКонтакте: https://vk.ru/headinspect
+- [Проверка canonical](https://headinspect.ru/canonical/): проверка canonical URL (в разработке).
+- [Проверка Schema.org и JSON-LD](https://headinspect.ru/schema/): проверка микроразметки Schema.org и JSON-LD (в разработке).
+- [Проверка изображений](https://headinspect.ru/images/): проверка изображений, alt, размеров и форматов (в разработке).
+- [Проверка sitemap](https://headinspect.ru/sitemap/): проверка sitemap и структуры URL (в разработке).
