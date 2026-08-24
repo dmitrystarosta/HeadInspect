@@ -87,6 +87,8 @@ class JobManager:
 
                 await run_pages(urls, on_result)
 
+                self._apply_meta_duplicate_warnings(job.results)
+
                 async with job.lock:
                     job.status = "completed"
                     job.completed_at = utcnow()
@@ -101,6 +103,31 @@ class JobManager:
                     job.status = "failed"
                     job.error = "Audit failed"
                     job.completed_at = utcnow()
+
+    @staticmethod
+    def _apply_meta_duplicate_warnings(results: list[PageResult]) -> None:
+        checks = (
+            ("title", "Одинаковый <title> используется на нескольких страницах"),
+            ("description", "Одинаковый meta description используется на нескольких страницах"),
+            ("keywords", "Одинаковый meta keywords используется на нескольких страницах"),
+        )
+
+        for field_name, message in checks:
+            groups: dict[str, list[PageResult]] = {}
+            for result in results:
+                value = getattr(result.meta, field_name, None)
+                if not value:
+                    continue
+                normalized = " ".join(value.split()).casefold()
+                groups.setdefault(normalized, []).append(result)
+
+            for matches in groups.values():
+                if len(matches) < 2:
+                    continue
+                warning = f"{message}: {len(matches)} страниц"
+                for result in matches:
+                    if warning not in result.meta.warnings:
+                        result.meta.warnings.append(warning)
 
     def status_model(self, job: Job) -> AuditJobStatus:
         total = job.discovered_urls

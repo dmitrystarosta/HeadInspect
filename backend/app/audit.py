@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException
 
+from .analyzers.meta import analyze_meta
 from .analyzers.open_graph import analyze_open_graph
 from .config import MAX_HTML_BYTES, PAGE_CONCURRENCY
 from .fetcher import safe_fetch
@@ -51,12 +52,15 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
         errors.extend(og_errors)
         warnings.extend(og_warnings)
 
+        meta_data = analyze_meta(parser)
+
         return PageResult(
             url=result.url,
             status_code=result.status_code,
             title=parser.title,
             meta_description=parser.meta_description,
             open_graph=og_data,
+            meta=meta_data,
             errors=errors,
             warnings=warnings,
         )

@@ -30,12 +30,30 @@ class OpenGraphData(BaseModel):
     image_height: int | None = None
 
 
+class MetaData(BaseModel):
+    title: str | None = None
+    title_count: int = 0
+    description: str | None = None
+    description_count: int = 0
+    keywords: str | None = None
+    keywords_count: int = 0
+    robots: str | None = None
+    robots_count: int = 0
+    viewport: str | None = None
+    viewport_count: int = 0
+    lang: str | None = None
+    charset: str | None = None
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class PageResult(BaseModel):
     url: str
     status_code: int | None = None
     title: str | None = None
     meta_description: str | None = None
     open_graph: OpenGraphData = Field(default_factory=OpenGraphData)
+    meta: MetaData = Field(default_factory=MetaData)
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
