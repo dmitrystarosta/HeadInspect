@@ -132,20 +132,34 @@ function updateProgress(status) {
   }
 }
 
-function renderHomeResult(status, results, jobId) {
-  const pages = results?.results || [];
-  const errors = pages.reduce((sum, page) => sum + (page.errors?.length || 0), 0);
-  const warnings = pages.reduce((sum, page) => sum + (page.warnings?.length || 0), 0);
+function moduleTotals(pages, moduleName) {
+  if (moduleName === "meta") {
+    return pages.reduce((totals, page) => {
+      const meta = page.meta || {};
+      totals.errors += Array.isArray(meta.errors) ? meta.errors.length : 0;
+      totals.warnings += Array.isArray(meta.warnings) ? meta.warnings.length : 0;
+      return totals;
+    }, { errors: 0, warnings: 0 });
+  }
 
-  $("#home-result-total").textContent = status.checked_urls ?? pages.length;
+  return pages.reduce((totals, page) => {
+    totals.errors += Array.isArray(page.errors) ? page.errors.length : 0;
+    totals.warnings += Array.isArray(page.warnings) ? page.warnings.length : 0;
+    return totals;
+  }, { errors: 0, warnings: 0 });
+}
 
-  const module = $(".audit-module.active");
+function renderAuditModule(moduleName, pages, status, jobId) {
+  const module = $(`.audit-module[data-module="${moduleName}"]`);
+  if (!module) return;
+
+  const { errors, warnings } = moduleTotals(pages, moduleName);
   const dot = $(".module-status", module);
   const counts = $(".module-counts", module);
   const bodyText = $(".audit-module-body p", module);
   const link = $(".audit-module-body a", module);
 
-  dot?.classList.remove("error", "warning", "success");
+  dot?.classList.remove("error", "warning", "success", "soon");
   dot?.classList.add(errors ? "error" : warnings ? "warning" : "success");
 
   if (counts) {
@@ -156,17 +170,31 @@ function renderHomeResult(status, results, jobId) {
     }
   }
 
+  const checkedText = moduleName === "meta"
+    ? `Meta-теги проверены на ${pages.length} страницах.`
+    : `Open Graph проверен на ${pages.length} страницах.`;
+
   if (bodyText) {
     bodyText.textContent = errors || warnings
-      ? `Open Graph проверен на ${pages.length} страницах. Найдено ошибок: ${errors}, предупреждений: ${warnings}.`
-      : `Open Graph проверен на ${pages.length} страницах. Ошибок и предупреждений не найдено.`;
+      ? `${checkedText} Найдено ошибок: ${errors}, предупреждений: ${warnings}.`
+      : `${checkedText} Ошибок и предупреждений не найдено.`;
   }
 
-  // Передаём URL на специализированную страницу, чтобы его не пришлось вводить заново.
   if (link && status.normalized_url) {
-    link.href = `/open-graph/?job=${encodeURIComponent(jobId)}&url=${encodeURIComponent(status.normalized_url)}`;
-    link.textContent = "Открыть подробный Open Graph-аудит";
+    const basePath = moduleName === "meta" ? "/meta/" : "/open-graph/";
+    link.href = `${basePath}?job=${encodeURIComponent(jobId)}&url=${encodeURIComponent(status.normalized_url)}`;
+    link.textContent = moduleName === "meta"
+      ? "Открыть подробный Meta-аудит"
+      : "Открыть подробный Open Graph-аудит";
   }
+}
+
+function renderHomeResult(status, results, jobId) {
+  const pages = results?.results || [];
+  $("#home-result-total").textContent = status.checked_urls ?? pages.length;
+
+  renderAuditModule("open-graph", pages, status, jobId);
+  renderAuditModule("meta", pages, status, jobId);
 
   progressCard.hidden = true;
   resultsCard.hidden = false;
@@ -261,16 +289,18 @@ $("#home-restart-btn")?.addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
-// Open/close the active module body.
-const moduleButton = $(".audit-module.active .audit-module-head");
-moduleButton?.addEventListener("click", () => {
-  const module = moduleButton.closest(".audit-module");
-  const body = $(".audit-module-body", module);
-  const open = !body.hidden;
-  body.hidden = open;
-  moduleButton.setAttribute("aria-expanded", String(!open));
-  const arrow = $(".module-arrow", moduleButton);
-  if (arrow) arrow.textContent = open ? "⌄" : "⌃";
+// Open/close each working module independently.
+$$('.audit-module.active .audit-module-head').forEach(moduleButton => {
+  moduleButton.addEventListener("click", () => {
+    const module = moduleButton.closest(".audit-module");
+    const body = $(".audit-module-body", module);
+    if (!body) return;
+    const open = !body.hidden;
+    body.hidden = open;
+    moduleButton.setAttribute("aria-expanded", String(!open));
+    const arrow = $(".module-arrow", moduleButton);
+    if (arrow) arrow.textContent = open ? "⌄" : "⌃";
+  });
 });
 
 // FAQ accordion.
