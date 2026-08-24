@@ -1096,3 +1096,12 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
     color: var(--error) !important;
   }
 }
+
+/* === Meta audit === */
+.meta-detail-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 980px) {
+  .meta-hero-panel { display: none; }
+}
