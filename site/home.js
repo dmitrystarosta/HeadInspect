@@ -21,8 +21,17 @@ function setHomeAuditUrl(jobId, urlValue) {
   const query = params.toString();
   window.history.replaceState({}, "", query ? `/?${query}` : "/");
 
-  const headerBrand = $(".site-header .brand");
-  if (headerBrand) headerBrand.href = query ? `/?${query}` : "/";
+  const auditPaths = new Set(["/", "/open-graph/", "/meta/", "/canonical/", "/schema/", "/images/", "/sitemap/"]);
+  $$(".main-nav a, .site-header .brand, .cross-tool-links a").forEach(link => {
+    let target;
+    try {
+      target = new URL(link.getAttribute("href"), window.location.origin);
+    } catch {
+      return;
+    }
+    if (target.origin !== window.location.origin || !auditPaths.has(target.pathname)) return;
+    link.href = query ? `${target.pathname}?${query}${target.hash}` : `${target.pathname}${target.hash}`;
+  });
 }
 
 

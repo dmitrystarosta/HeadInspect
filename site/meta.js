@@ -29,11 +29,11 @@ function setAuditContext(jobId, urlValue) {
   const currentPath = window.location.pathname;
   window.history.replaceState({}, "", `${currentPath}?${query}`);
 
-  const supportedPaths = new Set(["/", "/open-graph/", "/meta/"]);
+  const supportedPaths = new Set(["/", "/open-graph/", "/meta/", "/canonical/", "/schema/", "/images/", "/sitemap/"]);
   $$(".cross-tool-links a, .main-nav a, .site-header .brand").forEach(link => {
-    const path = new URL(link.href, window.location.origin).pathname;
-    if (supportedPaths.has(path)) {
-      link.href = `${path}?${query}`;
+    const target = new URL(link.getAttribute("href"), window.location.origin);
+    if (target.origin === window.location.origin && supportedPaths.has(target.pathname)) {
+      link.href = `${target.pathname}?${query}${target.hash}`;
     }
   });
 }
