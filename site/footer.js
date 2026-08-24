@@ -12,16 +12,32 @@
           </a>
           <p>Массовая проверка технических данных сайта.</p>
         </div>
-        <div class="footer-links">
-          <a href="/open-graph/">Open Graph</a>
-          <a href="/meta/">Meta</a>
-          <a href="/canonical/">Canonical</a>
-          <a href="/schema/">Schema</a>
-          <a href="/images/">Images</a>
-          <a href="/sitemap/">Sitemap</a>
-          <a href="https://github.com/dmitrystarosta/HeadInspect" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
-          <a href="https://t.me/headinspect" target="_blank" rel="noopener noreferrer">Telegram ↗</a>
-          <a href="https://vk.ru/headinspect" target="_blank" rel="noopener noreferrer">ВКонтакте ↗</a>
+        <div class="footer-link-groups">
+          <div class="footer-link-group">
+            <span class="footer-link-label">Проверки</span>
+            <div class="footer-links">
+              <a href="/open-graph/">Open Graph</a>
+              <a href="/meta/">Meta</a>
+              <a href="/canonical/">Canonical</a>
+              <a href="/schema/">Schema</a>
+              <a href="/images/">Images</a>
+              <a href="/sitemap/">Sitemap</a>
+            </div>
+          </div>
+          <div class="footer-link-group">
+            <span class="footer-link-label">Ссылки</span>
+            <div class="footer-links">
+              <a href="https://github.com/dmitrystarosta/HeadInspect" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+              <a href="https://t.me/headinspect" target="_blank" rel="noopener noreferrer">Telegram ↗</a>
+              <a href="https://vk.ru/headinspect" target="_blank" rel="noopener noreferrer">ВКонтакте ↗</a>
+            </div>
+          </div>
+          <div class="footer-link-group">
+            <span class="footer-link-label">Документы</span>
+            <div class="footer-links">
+              <a href="/privacy/">Политика обработки персональных данных</a>
+            </div>
+          </div>
         </div>
       </div>
       <aside class="other-projects" aria-label="Другие проекты">
