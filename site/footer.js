@@ -30,6 +30,7 @@
               <a href="https://github.com/dmitrystarosta/HeadInspect" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
               <a href="https://t.me/headinspect" target="_blank" rel="noopener noreferrer">Telegram ↗</a>
               <a href="https://vk.ru/headinspect" target="_blank" rel="noopener noreferrer">ВКонтакте ↗</a>
+              <a href="mailto:headinspect@starosta.ru?subject=%D0%9F%D0%B8%D1%81%D1%8C%D0%BC%D0%BE%20%D1%81%20%D1%81%D0%B0%D0%B9%D1%82%D0%B0%20%C2%ABHeadInspect%C2%BB">Связаться ↗</a>
             </div>
           </div>
           <div class="footer-link-group">
