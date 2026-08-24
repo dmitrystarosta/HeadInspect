@@ -30,7 +30,7 @@ function setAuditContext(jobId, urlValue) {
   window.history.replaceState({}, "", `${currentPath}?${query}`);
 
   const supportedPaths = new Set(["/", "/open-graph/", "/meta/"]);
-  $$(".cross-tool-links a, .main-nav a").forEach(link => {
+  $$(".cross-tool-links a, .main-nav a, .site-header .brand").forEach(link => {
     const path = new URL(link.href, window.location.origin).pathname;
     if (supportedPaths.has(path)) {
       link.href = `${path}?${query}`;

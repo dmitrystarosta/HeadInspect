@@ -1,5 +1,4 @@
 User-agent: *
-Disallow: /meta/
 Disallow: /canonical/
 Disallow: /schema/
 Disallow: /images/

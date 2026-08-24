@@ -20,6 +20,9 @@ function setHomeAuditUrl(jobId, urlValue) {
   if (urlValue) params.set("url", urlValue);
   const query = params.toString();
   window.history.replaceState({}, "", query ? `/?${query}` : "/");
+
+  const headerBrand = $(".site-header .brand");
+  if (headerBrand) headerBrand.href = query ? `/?${query}` : "/";
 }
 
 
