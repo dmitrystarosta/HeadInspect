@@ -781,9 +781,11 @@ img { max-width: 100%; }
   align-items: start;
 }
 .footer-main { display: grid; gap: 24px; }
+.footer-about { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.footer-brand { margin: 0; }
 .footer-brand .brand-mark { background: #e2e8f0; color: #0b1120; }
-.footer-inner p { color: #a8b3c5; margin: 10px 0 0; font-size: 13px; }
-.footer-links { display: flex; flex-wrap: wrap; gap: 18px; font-weight: 750; font-size: 13px; }
+.footer-about p { color: #a8b3c5; margin: 0; font-size: 13px; line-height: 1.5; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 18px; margin: 0; font-weight: 750; font-size: 13px; line-height: 1.5; }
 
 .other-projects-label {
   margin-bottom: 10px;
