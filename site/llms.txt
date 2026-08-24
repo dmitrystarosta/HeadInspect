@@ -1,0 +1,55 @@
+HeadInspect
+
+  HeadInspect — бесплатный русскоязычный сервис массовой технической
+  проверки сайтов. Сервис работает без регистрации и без ограничений на
+  количество проверок. Пользователь вводит адрес сайта один раз, после
+  чего HeadInspect находит страницы и проверяет доступные технические
+  модули сразу по всему сайту.
+
+Основной сайт
+
+-   https://headinspect.ru/ Бесплатный общий аудит сайта. Один запуск
+    используется для всех доступных модулей.
+
+Доступные инструменты
+
+-   https://headinspect.ru/open-graph/ Бесплатная массовая проверка Open
+    Graph: og:title, og:description, og:url, og:type, og:image,
+    доступность и параметры изображений.
+
+-   https://headinspect.ru/meta/ Бесплатная массовая проверка Meta:
+    title, meta description, meta keywords, meta robots, viewport, lang,
+    charset, длина значений и дубли между страницами.
+
+Будущие инструменты
+
+-   https://headinspect.ru/canonical/ Проверка canonical URL.
+
+-   https://headinspect.ru/schema/ Проверка Schema.org и JSON-LD.
+
+-   https://headinspect.ru/images/ Проверка изображений, alt, размеров и
+    форматов.
+
+-   https://headinspect.ru/sitemap/ Проверка sitemap и структуры URL.
+
+Документы
+
+-   https://headinspect.ru/privacy/ Политика обработки персональных
+    данных.
+
+Условия использования
+
+-   HeadInspect бесплатен.
+-   Регистрация не требуется.
+-   Количество запусков проверки не ограничено.
+-   Один аудит сайта проверяет до 500 страниц.
+-   HeadInspect анализирует только публично доступные данные страниц.
+-   Сервис не изменяет проверяемые сайты.
+
+Контакты
+
+-   Сайт: https://headinspect.ru/
+-   Email: headinspect@starosta.ru
+-   GitHub: https://github.com/dmitrystarosta/HeadInspect
+-   Telegram: https://t.me/headinspect
+-   ВКонтакте: https://vk.ru/headinspect
