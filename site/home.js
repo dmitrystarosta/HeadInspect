@@ -145,6 +145,15 @@ function moduleTotals(pages, moduleName) {
     }, { errors: 0, warnings: 0 });
   }
 
+  if (moduleName === "schema") {
+    return pages.reduce((totals, page) => {
+      const schema = page.schema || {};
+      totals.errors += Array.isArray(schema.errors) ? schema.errors.length : 0;
+      totals.warnings += Array.isArray(schema.warnings) ? schema.warnings.length : 0;
+      return totals;
+    }, { errors: 0, warnings: 0 });
+  }
+
   return pages.reduce((totals, page) => {
     totals.errors += Array.isArray(page.errors) ? page.errors.length : 0;
     totals.warnings += Array.isArray(page.warnings) ? page.warnings.length : 0;
@@ -175,7 +184,9 @@ function renderAuditModule(moduleName, pages, status, jobId) {
 
   const checkedText = moduleName === "meta"
     ? `Meta-теги проверены на ${pages.length} страницах.`
-    : `Open Graph проверен на ${pages.length} страницах.`;
+    : moduleName === "schema"
+      ? `Schema.org проверена на ${pages.length} страницах.`
+      : `Open Graph проверен на ${pages.length} страницах.`;
 
   if (bodyText) {
     bodyText.textContent = errors || warnings
@@ -184,11 +195,17 @@ function renderAuditModule(moduleName, pages, status, jobId) {
   }
 
   if (link && status.normalized_url) {
-    const basePath = moduleName === "meta" ? "/meta/" : "/open-graph/";
+    const basePath = moduleName === "meta"
+      ? "/meta/"
+      : moduleName === "schema"
+        ? "/schema/"
+        : "/open-graph/";
     link.href = `${basePath}?job=${encodeURIComponent(jobId)}&url=${encodeURIComponent(status.normalized_url)}`;
     link.textContent = moduleName === "meta"
       ? "Открыть подробный Meta-аудит"
-      : "Открыть подробный Open Graph-аудит";
+      : moduleName === "schema"
+        ? "Открыть подробный Schema-аудит"
+        : "Открыть подробный Open Graph-аудит";
   }
 }
 
@@ -198,6 +215,7 @@ function renderHomeResult(status, results, jobId) {
 
   renderAuditModule("open-graph", pages, status, jobId);
   renderAuditModule("meta", pages, status, jobId);
+  renderAuditModule("schema", pages, status, jobId);
 
   progressCard.hidden = true;
   resultsCard.hidden = false;
