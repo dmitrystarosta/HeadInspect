@@ -23,6 +23,66 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
   <link rel="stylesheet" href="../styles.css">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://headinspect.ru/#website",
+      "url": "https://headinspect.ru/",
+      "name": "HeadInspect",
+      "inLanguage": "ru-RU",
+      "description": "HeadInspect — бесплатный сервис массовой технической проверки страниц сайта.",
+      "publisher": {
+        "@id": "https://headinspect.ru/#creator"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://headinspect.ru/#creator",
+      "name": "Dmitry Starosta",
+      "url": "https://dmitrystarosta.github.io/projects/"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://headinspect.ru/schema/#webpage",
+      "url": "https://headinspect.ru/schema/",
+      "name": "Проверка Schema.org всего сайта — HeadInspect",
+      "description": "Массовая проверка JSON-LD и Schema.org: синтаксис JSON, @context, @type, типы разметки и основные проблемы структурированных данных.",
+      "inLanguage": "ru-RU",
+      "isPartOf": {
+        "@id": "https://headinspect.ru/#website"
+      },
+      "mainEntity": {
+        "@id": "https://headinspect.ru/schema/#app"
+      }
+    },
+    {
+      "@type": "WebApplication",
+      "name": "Проверка Schema.org всего сайта",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Любая ОС с современным веб-браузером",
+      "inLanguage": "ru-RU",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "RUB"
+      },
+      "creator": {
+        "@id": "https://headinspect.ru/#creator"
+      },
+      "isPartOf": {
+        "@id": "https://headinspect.ru/#website"
+      },
+      "@id": "https://headinspect.ru/schema/#app",
+      "url": "https://headinspect.ru/schema/",
+      "description": "Проверяет JSON-LD и Schema.org на страницах сайта: синтаксис JSON, @context, @type, типы структурированных данных и основные проблемы."
+    }
+  ]
+}
+  </script>
 </head>
 <body>
   <header class="site-header">
