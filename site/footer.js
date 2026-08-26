@@ -48,6 +48,6 @@
           <span class="project-card-copy"><strong>Белый список?</strong><small>Проверка доступности сайтов при ограничениях мобильного интернета.</small><span class="project-url">belyjspisok.ru ↗</span></span>
         </a>
       </aside>
-      <small class="copyright">© 2026 Dmitry Starosta</small>
+      <small class="copyright">© 2026 · <a href="https://dmitrystarosta.github.io/projects/" target="_blank" rel="noopener noreferrer" title="Dmitry Starosta — разработчик сайта HeadInspect" aria-label="Dmitry Starosta — разработчик сайта HeadInspect">Dmitry Starosta</a></small>
     </div>`;
 })();
