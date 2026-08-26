@@ -66,7 +66,7 @@ class PageResult(BaseModel):
     meta_description: str | None = None
     open_graph: OpenGraphData = Field(default_factory=OpenGraphData)
     meta: MetaData = Field(default_factory=MetaData)
-    schema: SchemaData = Field(default_factory=SchemaData)
+    schema_data: SchemaData = Field(Field(default_factory=SchemaData), alias="schema")
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

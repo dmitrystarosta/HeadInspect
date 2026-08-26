@@ -63,7 +63,7 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
             meta_description=parser.meta_description,
             open_graph=og_data,
             meta=meta_data,
-            schema=schema_data,
+            schema_data=schema_data,
             errors=errors,
             warnings=warnings,
         )

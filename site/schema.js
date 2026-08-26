@@ -191,6 +191,34 @@ function updateProgressUi(status) {
   }
 }
 
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+
+  if (response.status === 429) {
+    throw new Error("Слишком много запусков подряд. Подождите немного и попробуйте снова.");
+  }
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    // handled below
+  }
+
+  if (!response.ok) {
+    const detail = data && data.detail ? data.detail : `Ошибка API (${response.status})`;
+    throw new Error(detail);
+  }
+
+  return data;
+}
+
 async function startAudit(url) {
   if (pollAbortController) pollAbortController.abort();
   pollAbortController = new AbortController();
