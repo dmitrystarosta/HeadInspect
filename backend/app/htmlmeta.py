@@ -20,9 +20,24 @@ class MetadataParser(HTMLParser):
         self.html_lang: str | None = None
         self.charset: str | None = None
 
+        self.in_json_ld = False
+        self.current_json_ld_parts: list[str] = []
+        self.json_ld_blocks: list[str] = []
+        self.microdata_types: list[str] = []
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
         data = {k.lower(): (v or "") for k, v in attrs}
+
+        if tag == "script" and data.get("type", "").strip().lower() == "application/ld+json":
+            self.in_json_ld = True
+            self.current_json_ld_parts = []
+            return
+
+        if "itemscope" in data:
+            itemtype = data.get("itemtype", "").strip()
+            if itemtype:
+                self.microdata_types.append(itemtype)
 
         if tag == "html" and self.html_lang is None:
             self.html_lang = data.get("lang", "").strip() or None
@@ -60,7 +75,14 @@ class MetadataParser(HTMLParser):
             self.og.setdefault(prop, []).append(content)
 
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() != "title":
+        tag = tag.lower()
+        if tag == "script" and self.in_json_ld:
+            self.json_ld_blocks.append("".join(self.current_json_ld_parts).strip())
+            self.in_json_ld = False
+            self.current_json_ld_parts = []
+            return
+
+        if tag != "title":
             return
 
         if self.in_title:
@@ -73,7 +95,9 @@ class MetadataParser(HTMLParser):
         self.current_title_parts = []
 
     def handle_data(self, data: str) -> None:
-        if self.in_title:
+        if self.in_json_ld:
+            self.current_json_ld_parts.append(data)
+        elif self.in_title:
             self.current_title_parts.append(data)
 
     @property

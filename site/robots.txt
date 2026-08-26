@@ -1,6 +1,5 @@
 User-agent: *
 Disallow: /canonical/
-Disallow: /schema/
 Disallow: /images/
 Disallow: /sitemap/
 

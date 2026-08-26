@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from .analyzers.meta import analyze_meta
 from .analyzers.open_graph import analyze_open_graph
+from .analyzers.schema import analyze_schema
 from .config import MAX_HTML_BYTES, PAGE_CONCURRENCY
 from .fetcher import safe_fetch
 from .htmlmeta import MetadataParser
@@ -53,6 +54,7 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
         warnings.extend(og_warnings)
 
         meta_data = analyze_meta(parser)
+        schema_data = analyze_schema(parser.json_ld_blocks, parser.microdata_types)
 
         return PageResult(
             url=result.url,
@@ -61,6 +63,7 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
             meta_description=parser.meta_description,
             open_graph=og_data,
             meta=meta_data,
+            schema=schema_data,
             errors=errors,
             warnings=warnings,
         )

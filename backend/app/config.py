@@ -1,11 +1,11 @@
 import os
 
 APP_NAME = "HeadInspect API"
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 
 USER_AGENT = os.getenv(
     "HEADINSPECT_USER_AGENT",
-    "HeadInspectBot/0.3 (+https://headinspect.ru/)",
+    "HeadInspectBot/0.4 (+https://headinspect.ru/)",
 )
 
 CONNECT_TIMEOUT = 5.0
