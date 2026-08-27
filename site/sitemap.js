@@ -512,7 +512,7 @@ function toggleDetail(item, detailHost, row, button) {
   const list = $(".meta-list", tpl);
   entries.forEach(([label, value]) => {
     const line = document.createElement("div");
-    line.className = "meta-line";
+    line.className = "meta-item";
     line.innerHTML = `<span>${escapeHtml(label)}</span><code>${escapeHtml(value || "—")}</code>`;
     list.appendChild(line);
   });

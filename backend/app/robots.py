@@ -35,7 +35,7 @@ def sitemap_urls_from_robots(robots_text: str) -> list[str]:
         if not line or ":" not in line:
             continue
         key, value = line.split(":", 1)
-        if key.strip().lower() == "sitemap":
+        if key.strip().lstrip("\ufeff").lower() == "sitemap":
             candidate = value.strip()
             if candidate and candidate not in found:
                 found.append(candidate)
