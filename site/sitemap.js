@@ -389,6 +389,7 @@ function updateRobotsResult(status) {
   const found = Array.isArray(status.sitemap_urls) ? status.sitemap_urls : [];
 
   box.hidden = false;
+  box.style.marginTop = "14px";
   box.classList.remove("ok", "warn", "error");
   url.textContent = status.robots_url || "";
 
@@ -524,7 +525,6 @@ function toggleDetail(item, detailHost, row, button) {
   const actions = $(".detail-actions", tpl);
   if (row.pageUrl) {
     const open = document.createElement("a");
-    open.className = "secondary-btn link-btn compact-btn";
     open.href = row.pageUrl;
     open.target = "_blank";
     open.rel = "noopener";
