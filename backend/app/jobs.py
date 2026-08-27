@@ -24,6 +24,7 @@ class Job:
     normalized_url: str | None = None
     robots_url: str | None = None
     robots_found: bool | None = None
+    robots_sitemap_urls: list[str] = field(default_factory=list)
     sitemap_urls: list[str] = field(default_factory=list)
     discovered_urls: int = 0
     checked_urls: int = 0
@@ -71,6 +72,7 @@ class JobManager:
                     job.normalized_url = discovered["normalized_url"]
                     job.robots_url = discovered["robots_url"]
                     job.robots_found = discovered["robots_found"]
+                    job.robots_sitemap_urls = discovered["robots_sitemap_urls"]
                     job.sitemap_urls = discovered["sitemap_urls"]
                     job.discovered_urls = len(urls)
                     job.limited = discovered["limited"]
@@ -144,6 +146,7 @@ class JobManager:
             normalized_url=job.normalized_url,
             robots_url=job.robots_url,
             robots_found=job.robots_found,
+            robots_sitemap_urls=job.robots_sitemap_urls,
             sitemap_urls=job.sitemap_urls,
             discovered_urls=job.discovered_urls,
             checked_urls=job.checked_urls,

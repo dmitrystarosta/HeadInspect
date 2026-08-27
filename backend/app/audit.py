@@ -34,6 +34,7 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
         except HTTPException as exc:
             return PageResult(
                 url=url,
+                requested_url=url,
                 status_code=None,
                 errors=[f"Страница недоступна: {exc.detail}"],
             )
@@ -58,6 +59,7 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
 
         return PageResult(
             url=result.url,
+            requested_url=url,
             status_code=result.status_code,
             title=parser.title,
             meta_description=parser.meta_description,
@@ -84,6 +86,7 @@ async def discover_audit_urls(raw_url: str) -> dict:
         "normalized_url": normalized,
         "robots_url": robots_url,
         "robots_found": robots_found,
+        "robots_sitemap_urls": robots_sitemaps,
         "sitemap_urls": processed_sitemaps,
         "urls": urls,
         "limited": limited,

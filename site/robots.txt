@@ -1,6 +1,5 @@
 User-agent: *
 Disallow: /canonical/
 Disallow: /images/
-Disallow: /sitemap/
 
 Sitemap: https://headinspect.ru/sitemap.xml

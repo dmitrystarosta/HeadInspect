@@ -10,6 +10,8 @@
 
 - [Проверка Open Graph](https://headinspect.ru/open-graph/): массовая проверка og:title, og:description, og:url, og:type, og:image, доступности и параметров изображений.
 - [Проверка Meta](https://headinspect.ru/meta/): массовая проверка title, meta description, meta keywords, meta robots, viewport, lang, charset, длины значений и дублей между страницами.
+- [Проверка Schema.org и JSON-LD](https://headinspect.ru/schema/): массовая проверка JSON-LD, @context, @type и Microdata.
+- [Проверка Sitemap](https://headinspect.ru/sitemap/): массовая проверка sitemap.xml, sitemap-index, URL карты сайта, HTTP-ошибок и редиректов.
 
 ## Документы
 
@@ -37,6 +39,4 @@
 Инструменты в разработке. Страницы уже доступны и содержат описание, но сама проверка пока не запущена.
 
 - [Проверка canonical](https://headinspect.ru/canonical/): проверка canonical URL (в разработке).
-- [Проверка Schema.org и JSON-LD](https://headinspect.ru/schema/): проверка микроразметки Schema.org и JSON-LD (в разработке).
 - [Проверка изображений](https://headinspect.ru/images/): проверка изображений, alt, размеров и форматов (в разработке).
-- [Проверка sitemap](https://headinspect.ru/sitemap/): проверка sitemap и структуры URL (в разработке).

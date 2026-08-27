@@ -61,6 +61,7 @@ class SchemaData(BaseModel):
 
 class PageResult(BaseModel):
     url: str
+    requested_url: str | None = None
     status_code: int | None = None
     title: str | None = None
     meta_description: str | None = None
@@ -88,6 +89,7 @@ class AuditJobStatus(BaseModel):
     normalized_url: str | None = None
     robots_url: str | None = None
     robots_found: bool | None = None
+    robots_sitemap_urls: list[str] = Field(default_factory=list)
     sitemap_urls: list[str] = Field(default_factory=list)
     discovered_urls: int = 0
     checked_urls: int = 0

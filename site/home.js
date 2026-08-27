@@ -154,6 +154,14 @@ function moduleTotals(pages, moduleName) {
     }, { errors: 0, warnings: 0 });
   }
 
+  if (moduleName === "sitemap") {
+    return pages.reduce((totals, page) => {
+      if (Array.isArray(page.errors) && page.errors.length) totals.errors += 1;
+      else if (page.requested_url && page.url && page.requested_url !== page.url) totals.warnings += 1;
+      return totals;
+    }, { errors: 0, warnings: 0 });
+  }
+
   return pages.reduce((totals, page) => {
     totals.errors += Array.isArray(page.errors) ? page.errors.length : 0;
     totals.warnings += Array.isArray(page.warnings) ? page.warnings.length : 0;
@@ -165,7 +173,8 @@ function renderAuditModule(moduleName, pages, status, jobId) {
   const module = $(`.audit-module[data-module="${moduleName}"]`);
   if (!module) return;
 
-  const { errors, warnings } = moduleTotals(pages, moduleName);
+  let { errors, warnings } = moduleTotals(pages, moduleName);
+  if (moduleName === "sitemap" && !status.sitemap_urls?.length) errors += 1;
   const dot = $(".module-status", module);
   const counts = $(".module-counts", module);
   const bodyText = $(".audit-module-body p", module);
@@ -186,7 +195,9 @@ function renderAuditModule(moduleName, pages, status, jobId) {
     ? `Meta-теги проверены на ${pages.length} страницах.`
     : moduleName === "schema"
       ? `Schema.org проверена на ${pages.length} страницах.`
-      : `Open Graph проверен на ${pages.length} страницах.`;
+      : moduleName === "sitemap"
+        ? `Sitemap проверен: ${pages.length} URL.`
+        : `Open Graph проверен на ${pages.length} страницах.`;
 
   if (bodyText) {
     bodyText.textContent = errors || warnings
@@ -199,13 +210,17 @@ function renderAuditModule(moduleName, pages, status, jobId) {
       ? "/meta/"
       : moduleName === "schema"
         ? "/schema/"
-        : "/open-graph/";
+        : moduleName === "sitemap"
+          ? "/sitemap/"
+          : "/open-graph/";
     link.href = `${basePath}?job=${encodeURIComponent(jobId)}&url=${encodeURIComponent(status.normalized_url)}`;
     link.textContent = moduleName === "meta"
       ? "Открыть подробный Meta-аудит"
       : moduleName === "schema"
         ? "Открыть подробный Schema-аудит"
-        : "Открыть подробный Open Graph-аудит";
+        : moduleName === "sitemap"
+          ? "Открыть подробный Sitemap-аудит"
+          : "Открыть подробный Open Graph-аудит";
   }
 }
 
@@ -216,6 +231,7 @@ function renderHomeResult(status, results, jobId) {
   renderAuditModule("open-graph", pages, status, jobId);
   renderAuditModule("meta", pages, status, jobId);
   renderAuditModule("schema", pages, status, jobId);
+  renderAuditModule("sitemap", pages, status, jobId);
 
   progressCard.hidden = true;
   resultsCard.hidden = false;
