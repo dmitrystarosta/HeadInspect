@@ -7,8 +7,13 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       HEADINSPECT_ENV: production
-      HEADINSPECT_USER_AGENT: "HeadInspectBot/0.3 (+https://headinspect.ru/)"
+      HEADINSPECT_USER_AGENT: "HeadInspectBot/0.4 (+https://headinspect.ru/)"
     mem_limit: 448m
     cpus: 0.85
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
