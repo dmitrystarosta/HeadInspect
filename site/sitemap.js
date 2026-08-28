@@ -138,7 +138,6 @@ function mapApiRow(page) {
   }
   const originalUrl = page.requested_url || page.url;
   const finalUrl = page.url || originalUrl;
-  const pageErrors = Array.isArray(page.errors) ? page.errors : [];
   const statusCode = page.status_code;
   const redirected = originalUrl && finalUrl && originalUrl !== finalUrl;
 
@@ -147,11 +146,13 @@ function mapApiRow(page) {
   let issueTitle = "URL доступен";
   let issueText = statusCode ? `Страница отвечает HTTP ${statusCode}.` : "Не удалось получить ответ страницы.";
 
-  if (pageErrors.length || !statusCode || statusCode >= 400) {
+  // Sitemap оценивает только доступность URL и редиректы.
+  // Ошибки Open Graph, Meta и Schema относятся к своим модулям и здесь не учитываются.
+  if (!statusCode || statusCode >= 400) {
     status = "error";
-    message = pageErrors[0] || (statusCode ? `HTTP ${statusCode}` : "URL недоступен");
+    message = statusCode ? `HTTP ${statusCode}` : "URL недоступен";
     issueTitle = "URL из sitemap недоступен";
-    issueText = pageErrors.join(" · ") || message;
+    issueText = statusCode ? `Страница отвечает HTTP ${statusCode}.` : "Не удалось получить ответ страницы.";
   } else if (redirected || (statusCode >= 300 && statusCode < 400)) {
     status = "warning";
     message = redirected ? "Редирект на другой URL" : `HTTP ${statusCode}`;
