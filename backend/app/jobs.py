@@ -2,15 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-import uuid
 from time import monotonic
+import uuid
 
 from fastapi import HTTPException
 
 from .audit import discover_audit_urls, run_pages
-from .config import AUDIT_TIMEOUT, JOB_TTL_SECONDS, MAX_AUDIT_URLS, MAX_CONCURRENT_AUDITS
+from .config import (
+    AUDIT_TIMEOUT,
+    JOB_TTL_SECONDS,
+    MAX_AUDIT_URLS,
+    MAX_CONCURRENT_AUDITS,
+    MAX_QUEUED_AUDITS,
+    RATE_LIMIT_AUDITS,
+    RATE_LIMIT_WINDOW_SECONDS,
+)
 from .models import AuditJobStatus, AuditResultsResponse, JobStatus, PageResult
 
 
@@ -21,10 +30,21 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _format_wait(seconds: int) -> str:
+    seconds = max(1, seconds)
+    minutes, seconds = divmod(seconds, 60)
+    if minutes and seconds:
+        return f"{minutes} мин {seconds} сек"
+    if minutes:
+        return f"{minutes} мин"
+    return f"{seconds} сек"
+
+
 @dataclass
 class Job:
     job_id: str
     requested_url: str
+    client_ip: str = "unknown"
     status: JobStatus = "queued"
     normalized_url: str | None = None
     robots_url: str | None = None
@@ -49,12 +69,56 @@ class JobManager:
         self.jobs: dict[str, Job] = {}
         self.audit_slots = asyncio.Semaphore(MAX_CONCURRENT_AUDITS)
         self._cleanup_lock = asyncio.Lock()
+        self._create_lock = asyncio.Lock()
+        self._rate_attempts: dict[str, deque[float]] = defaultdict(deque)
 
-    async def create(self, requested_url: str) -> Job:
+    async def create(self, requested_url: str, *, client_ip: str) -> Job:
         await self.cleanup()
-        job = Job(job_id=uuid.uuid4().hex, requested_url=requested_url)
-        self.jobs[job.job_id] = job
-        logger.info("Audit %s queued: %s", job.job_id, requested_url)
+
+        async with self._create_lock:
+            queued_count = sum(1 for job in self.jobs.values() if job.status == "queued")
+            if queued_count >= MAX_QUEUED_AUDITS:
+                logger.warning(
+                    "Audit rejected: queue full (%s/%s), ip=%s, url=%s",
+                    queued_count,
+                    MAX_QUEUED_AUDITS,
+                    client_ip,
+                    requested_url,
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Сервис сейчас занят: очередь проверок заполнена. Попробуйте через несколько минут.",
+                    headers={"Retry-After": "60"},
+                )
+
+            now = monotonic()
+            attempts = self._rate_attempts[client_ip]
+            cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+            while attempts and attempts[0] <= cutoff:
+                attempts.popleft()
+
+            if len(attempts) >= RATE_LIMIT_AUDITS:
+                retry_after = max(1, int(attempts[0] + RATE_LIMIT_WINDOW_SECONDS - now + 0.999))
+                logger.warning(
+                    "Audit rate limited: ip=%s, retry_after=%ss, url=%s",
+                    client_ip,
+                    retry_after,
+                    requested_url,
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"Вы уже запустили {RATE_LIMIT_AUDITS} проверки за последние 2 минуты. "
+                        f"Следующую проверку можно запустить через {_format_wait(retry_after)}."
+                    ),
+                    headers={"Retry-After": str(retry_after)},
+                )
+
+            attempts.append(now)
+            job = Job(job_id=uuid.uuid4().hex, requested_url=requested_url, client_ip=client_ip)
+            self.jobs[job.job_id] = job
+
+        logger.info("Audit %s queued: ip=%s url=%s", job.job_id, client_ip, requested_url)
         asyncio.create_task(self._run(job))
         return job
 
@@ -74,9 +138,10 @@ class JobManager:
                     job.started_at = utcnow()
 
                 logger.info(
-                    "Audit %s started after %.3fs queue wait: %s",
+                    "Audit %s started after %.3fs queue wait: ip=%s url=%s",
                     job.job_id,
                     queue_wait,
+                    job.client_ip,
                     job.requested_url,
                 )
 
@@ -85,11 +150,12 @@ class JobManager:
                     discovered = await discover_audit_urls(job.requested_url)
                     urls: list[str] = discovered["urls"]
                     logger.info(
-                        "Audit %s discovery completed in %.3fs: %s pages, %s sitemap(s)",
+                        "Audit %s discovery completed in %.3fs: %s pages, %s sitemap(s), ip=%s",
                         job.job_id,
                         monotonic() - discovery_started,
                         len(urls),
                         len(discovered["sitemap_urls"]),
+                        job.client_ip,
                     )
 
                     async with job.lock:
@@ -121,29 +187,36 @@ class JobManager:
                     job.completed_at = utcnow()
                 elapsed = (job.completed_at - job.started_at).total_seconds() if job.started_at and job.completed_at else 0.0
                 logger.info(
-                    "Audit %s completed in %.3fs: %s/%s pages, errors=%s, warnings=%s",
+                    "Audit %s completed in %.3fs: %s/%s pages, errors=%s, warnings=%s, ip=%s",
                     job.job_id,
                     elapsed,
                     job.checked_urls,
                     job.discovered_urls,
                     job.errors_found,
                     job.warnings_found,
+                    job.client_ip,
                 )
 
             except asyncio.TimeoutError:
-                logger.error("Audit %s timed out after %.0f seconds: %s", job.job_id, AUDIT_TIMEOUT, job.requested_url)
+                logger.error(
+                    "Audit %s timed out after %.0f seconds: ip=%s url=%s",
+                    job.job_id,
+                    AUDIT_TIMEOUT,
+                    job.client_ip,
+                    job.requested_url,
+                )
                 async with job.lock:
                     job.status = "failed"
-                    job.error = f"Превышено максимальное время аудита ({AUDIT_TIMEOUT / 60:.0f} мин)"
+                    job.error = f"Проверка заняла больше {int(AUDIT_TIMEOUT)} секунд и была остановлена. Попробуйте ещё раз позже."
                     job.completed_at = utcnow()
             except HTTPException as exc:
-                logger.warning("Audit %s failed: %s", job.job_id, exc.detail)
+                logger.warning("Audit %s failed: %s, ip=%s", job.job_id, exc.detail, job.client_ip)
                 async with job.lock:
                     job.status = "failed"
                     job.error = str(exc.detail)
                     job.completed_at = utcnow()
             except Exception:
-                logger.exception("Audit %s failed with unexpected error", job.job_id)
+                logger.exception("Audit %s failed with unexpected error, ip=%s", job.job_id, job.client_ip)
                 async with job.lock:
                     job.status = "failed"
                     job.error = "Audit failed"
@@ -223,6 +296,18 @@ class JobManager:
             ]
             for job_id in stale:
                 self.jobs.pop(job_id, None)
+
+            # Keep the in-memory rate-limit map small on a long-running service.
+            now = monotonic()
+            rate_cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+            empty_ips: list[str] = []
+            for ip, attempts in self._rate_attempts.items():
+                while attempts and attempts[0] <= rate_cutoff:
+                    attempts.popleft()
+                if not attempts:
+                    empty_ips.append(ip)
+            for ip in empty_ips:
+                self._rate_attempts.pop(ip, None)
 
 
 job_manager = JobManager()

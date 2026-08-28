@@ -163,9 +163,6 @@ async function apiFetch(path, options = {}) {
     }
   });
 
-  if (response.status === 429) {
-    throw new Error("Слишком много запусков подряд. Подождите немного и попробуйте снова.");
-  }
 
   let data = null;
   try {

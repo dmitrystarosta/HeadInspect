@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import APP_NAME, APP_VERSION
@@ -36,8 +36,14 @@ async def health() -> dict[str, str]:
 
 
 @app.post("/api/audits", response_model=AuditCreateResponse, status_code=202)
-async def create_audit(payload: AuditRequest) -> AuditCreateResponse:
-    job = await job_manager.create(payload.url)
+async def create_audit(payload: AuditRequest, request: Request) -> AuditCreateResponse:
+    # The API is bound to localhost and is reached through our nginx reverse proxy,
+    # which sets X-Real-IP. Fall back to the socket peer for local/direct requests.
+    client_ip = request.headers.get("x-real-ip")
+    if not client_ip:
+        client_ip = request.client.host if request.client else "unknown"
+
+    job = await job_manager.create(payload.url, client_ip=client_ip)
     return AuditCreateResponse(
         job_id=job.job_id,
         status=job.status,
