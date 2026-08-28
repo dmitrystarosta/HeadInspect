@@ -134,11 +134,11 @@ async def analyze_open_graph(
     if data.image_width is not None and data.image_height is not None:
         if data.image_width < MIN_OG_WIDTH or data.image_height < MIN_OG_HEIGHT:
             warnings.append(
-                f"Маленькое og:image: {data.image_width}×{data.image_height}"
+                f"Маленькое og:image: {data.image_width}×{data.image_height}. Рекомендуется {RECOMMENDED_OG_WIDTH}×{RECOMMENDED_OG_HEIGHT}"
             )
         elif (data.image_width, data.image_height) != (RECOMMENDED_OG_WIDTH, RECOMMENDED_OG_HEIGHT):
             warnings.append(
-                f"Нестандартный размер og:image: {data.image_width}×{data.image_height}"
+                f"Нестандартный размер og:image: {data.image_width}×{data.image_height}. Рекомендуется {RECOMMENDED_OG_WIDTH}×{RECOMMENDED_OG_HEIGHT}"
             )
 
     try:

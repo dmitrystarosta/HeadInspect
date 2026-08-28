@@ -505,7 +505,7 @@ function toggleDetail(item, detailHost, row, button) {
     { key: "image HTTP", value: row.details.imageStatus },
     { key: "image MIME", value: row.details.imageType },
     { key: "image format", value: row.details.imageFormat },
-    { key: "image size", value: row.details.imageSize },
+    { key: "image size", value: row.details.imageSize, hint: row.details.imageSize !== "—" ? { text: "рекомендуемый размер 1200×630", state: row.details.imageSize === "1200×630" ? "ok" : "warn" } : null },
     { key: "image weight", value: row.details.imageWeight }
   ];
 

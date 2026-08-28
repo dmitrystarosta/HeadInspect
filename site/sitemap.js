@@ -124,15 +124,33 @@ function unusedMetaHint(value, type) {
 
 function mapApiRow(page) {
   if (page.check_failed) {
+    const checkError = page.check_error || "";
+    const contentTypeMatch = checkError.match(/Unexpected content type:\s*([^\s]+)/i);
+
+    // URL ответил, но вернул не HTML (например, image/jpeg). Для Sitemap это
+    // не «Без ответа»: показываем отдельную понятную ошибку самого URL в карте сайта.
+    if (contentTypeMatch) {
+      const contentType = contentTypeMatch[1];
+      return {
+        status: "error",
+        path: getPath(page.requested_url || page.url),
+        pageUrl: page.url || page.requested_url,
+        message: `Не HTML: ${contentType}`,
+        issueTitle: "URL ведёт не на HTML-страницу",
+        issueText: `URL из sitemap отвечает содержимым ${contentType}. Если это изображение, его лучше указывать через image sitemap / image:loc, а не как отдельную страницу в <loc>.`,
+        details: { originalUrl: page.requested_url || page.url, finalUrl: page.url || page.requested_url, statusCode: "ответ получен", redirected: false }
+      };
+    }
+
     return {
       status: "unavailable",
       path: getPath(page.requested_url || page.url),
       pageUrl: page.url || page.requested_url,
       message: "Не удалось проверить",
       issueTitle: "Страница не проверена",
-      issueText: page.check_error?.startsWith("Страница не ответила за")
+      issueText: checkError.startsWith("Страница не ответила за")
         ? "Страница не ответила за 30 с. Возможно, сервер отвечает слишком медленно или ограничивает частые автоматические запросы."
-        : (page.check_error || "HeadInspect не смог получить страницу."),
+        : (checkError || "HeadInspect не смог получить страницу."),
       details: { originalUrl: page.requested_url || page.url, finalUrl: page.url || page.requested_url, statusCode: "—", redirected: false }
     };
   }
@@ -144,7 +162,9 @@ function mapApiRow(page) {
   let status = "success";
   let message = statusCode ? `HTTP ${statusCode}` : "URL недоступен";
   let issueTitle = "URL доступен";
-  let issueText = statusCode ? `Страница отвечает HTTP ${statusCode}.` : "Не удалось получить ответ страницы.";
+  let issueText = statusCode === 403
+      ? "Сервер вернул HeadInspect HTTP 403 (доступ запрещён). Страница при этом может открываться в обычном браузере, если сайт ограничивает автоматические запросы."
+      : (statusCode ? `Страница отвечает HTTP ${statusCode}.` : "Не удалось получить ответ страницы.");
 
   // Sitemap оценивает только доступность URL и редиректы.
   // Ошибки Open Graph, Meta и Schema относятся к своим модулям и здесь не учитываются.
