@@ -413,8 +413,9 @@ function updateRobotsResult(status) {
   } else if (status.robots_found && found.length) {
     box.classList.add("warn");
     icon.textContent = "!";
-    title.textContent = "robots.txt найден";
-    text.textContent = "Sitemap в robots.txt не указан, но найден по стандартному адресу.";
+    title.textContent = "Sitemap не указан в robots.txt";
+    text.textContent = "Sitemap не указан в robots.txt, но HeadInspect нашёл его по стандартному адресу.";
+    url.textContent = found[0] || status.robots_url || "";
   } else if (!status.robots_found && found.length) {
     box.classList.add("warn");
     icon.textContent = "!";
