@@ -154,8 +154,13 @@ function moduleTotals(pages, moduleName) {
 
   if (moduleName === "sitemap") {
     return pages.reduce((totals, page) => {
-      if (Array.isArray(page.errors) && page.errors.length) totals.errors += 1;
-      else if (page.requested_url && page.url && page.requested_url !== page.url) totals.warnings += 1;
+      const statusCode = page.status_code;
+      const redirected = page.requested_url && page.url && page.requested_url !== page.url;
+
+      // Sitemap оценивает только доступность URL и редиректы.
+      // Ошибки Open Graph, Meta и Schema здесь не учитываются.
+      if (!statusCode || statusCode >= 400) totals.errors += 1;
+      else if (redirected || (statusCode >= 300 && statusCode < 400)) totals.warnings += 1;
       return totals;
     }, { errors: 0, warnings: 0 });
   }
