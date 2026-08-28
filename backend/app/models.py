@@ -101,6 +101,7 @@ class AuditJobStatus(BaseModel):
     errors_found: int = 0
     warnings_found: int = 0
     failed_checks: int = 0
+    access_blocked_status: int | None = None
     created_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None

@@ -79,6 +79,30 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
 async def discover_audit_urls(raw_url: str) -> dict:
     normalized = await validate_public_url(raw_url)
 
+    # Сначала проверяем сам введённый URL. Если сайт уже на входе запрещает
+    # автоматический доступ, дальнейший обход robots/sitemap даст недостоверный
+    # результат и только создаст лишнюю нагрузку.
+    try:
+        entry = await safe_fetch(
+            normalized,
+            max_bytes=MAX_HTML_BYTES,
+            accepted_content_types=("text/html", "application/xhtml+xml"),
+        )
+    except HTTPException:
+        entry = None
+
+    if entry is not None and entry.status_code in (401, 403, 429):
+        return {
+            "normalized_url": entry.url,
+            "robots_url": None,
+            "robots_found": None,
+            "robots_sitemap_urls": [],
+            "sitemap_urls": [],
+            "urls": [],
+            "limited": False,
+            "access_blocked_status": entry.status_code,
+        }
+
     robots_url, robots_found, robots_text = await fetch_robots(normalized)
     robots_sitemaps = sitemap_urls_from_robots(robots_text) if robots_found else []
 
@@ -95,6 +119,7 @@ async def discover_audit_urls(raw_url: str) -> dict:
         "sitemap_urls": processed_sitemaps,
         "urls": urls,
         "limited": limited,
+        "access_blocked_status": None,
     }
 
 

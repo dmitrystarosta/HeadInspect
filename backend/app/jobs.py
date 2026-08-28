@@ -57,6 +57,7 @@ class Job:
     errors_found: int = 0
     warnings_found: int = 0
     failed_checks: int = 0
+    access_blocked_status: int | None = None
     created_at: datetime = field(default_factory=utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -150,6 +151,7 @@ class JobManager:
                     discovery_started = monotonic()
                     discovered = await discover_audit_urls(job.requested_url)
                     urls: list[str] = discovered["urls"]
+                    access_blocked_status = discovered.get("access_blocked_status")
                     logger.info(
                         "Audit %s discovery completed in %.3fs: %s pages, %s sitemap(s), ip=%s",
                         job.job_id,
@@ -167,7 +169,18 @@ class JobManager:
                         job.sitemap_urls = discovered["sitemap_urls"]
                         job.discovered_urls = len(urls)
                         job.limited = discovered["limited"]
+                        job.access_blocked_status = access_blocked_status
                         job.status = "running"
+
+                    if access_blocked_status is not None:
+                        logger.warning(
+                            "Audit %s stopped at entry URL: HTTP %s blocks automated access, ip=%s url=%s",
+                            job.job_id,
+                            access_blocked_status,
+                            job.client_ip,
+                            job.requested_url,
+                        )
+                        return
 
                     async def on_result(result: PageResult) -> None:
                         async with job.lock:
@@ -285,6 +298,7 @@ class JobManager:
             errors_found=job.errors_found,
             warnings_found=job.warnings_found,
             failed_checks=job.failed_checks,
+            access_blocked_status=job.access_blocked_status,
             created_at=job.created_at,
             started_at=job.started_at,
             completed_at=job.completed_at,

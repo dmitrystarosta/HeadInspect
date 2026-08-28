@@ -279,6 +279,36 @@ function plural(n, one, few, many) {
   return many;
 }
 
+
+function showAccessBlocked(status) {
+  const code = status.access_blocked_status;
+  if (![401, 403, 429].includes(code)) return false;
+
+  const explanations = {
+    401: "Сервер требует авторизацию и не разрешил HeadInspect получить страницу.",
+    403: "Сервер запретил HeadInspect автоматический доступ. При этом сайт может нормально открываться в обычном браузере.",
+    429: "Сервер ограничил частоту автоматических запросов HeadInspect. Попробуйте повторить проверку позже."
+  };
+
+  progressCard.hidden = true;
+  resultsCard.hidden = false;
+  resultsCard.innerHTML = `
+    <div class="results-head">
+      <div>
+        <div class="section-kicker">РЕЗУЛЬТАТ</div>
+        <h2>Сайт не удалось проверить</h2>
+        <p>Сервер сайта вернул HeadInspect ответ <strong>HTTP ${code}</strong>.</p>
+      </div>
+    </div>
+    <div class="issue-box unavailable">
+      <strong>Проверка остановлена</strong>
+      <p>${explanations[code]}</p>
+      <p>Данные страниц сайта не анализировались, поскольку результаты такой проверки были бы недостоверными.</p>
+    </div>`;
+  resultsCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  return true;
+}
+
 async function startAudit(url) {
   if (pollAbortController) pollAbortController.abort();
   pollAbortController = new AbortController();
@@ -316,6 +346,7 @@ async function startAudit(url) {
     }
 
     if (status.status === "completed") {
+      if (showAccessBlocked(status)) return;
       const results = await apiFetch(`/api/audits/${created.job_id}/results`, {
         signal: pollAbortController.signal
       });
@@ -369,6 +400,7 @@ async function openExistingHomeAudit(jobId, fallbackUrl = null) {
     }
 
     if (status.status === "completed") {
+      if (showAccessBlocked(status)) return;
       const results = await apiFetch(`/api/audits/${jobId}/results`, {
         signal: pollAbortController.signal
       });
