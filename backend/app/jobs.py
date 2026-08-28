@@ -236,6 +236,16 @@ class JobManager:
         for field_name, message in checks:
             groups: dict[str, list[PageResult]] = {}
             for result in results:
+                # Не считаем редиректный URL отдельной страницей при поиске дублей.
+                # Его содержимое относится к конечному URL и иначе создаёт ложные
+                # дубли title/description/keywords. Сам редирект показывает Sitemap.
+                if result.check_failed or (
+                    result.requested_url
+                    and result.url
+                    and result.requested_url != result.url
+                ):
+                    continue
+
                 value = getattr(result.meta, field_name, None)
                 if not value:
                     continue
