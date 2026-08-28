@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException
@@ -15,6 +16,9 @@ from .models import PageResult
 from .robots import fetch_robots, sitemap_urls_from_robots
 from .security import validate_public_url
 from .sitemap import discover_urls
+
+
+logger = logging.getLogger("uvicorn.error")
 
 
 ProgressCallback = Callable[[PageResult], Awaitable[None]]
@@ -106,6 +110,7 @@ async def run_pages(
                 timeout=PAGE_TIMEOUT,
             )
         except asyncio.TimeoutError:
+            logger.warning("Page audit timed out after %.0fs: %s", PAGE_TIMEOUT, url)
             result = PageResult(
                 url=url,
                 requested_url=url,

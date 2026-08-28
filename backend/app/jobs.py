@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import uuid
+from time import monotonic
 
 from fastapi import HTTPException
 
@@ -13,7 +14,7 @@ from .config import AUDIT_TIMEOUT, JOB_TTL_SECONDS, MAX_AUDIT_URLS, MAX_CONCURRE
 from .models import AuditJobStatus, AuditResultsResponse, JobStatus, PageResult
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 def utcnow() -> datetime:
@@ -53,6 +54,7 @@ class JobManager:
         await self.cleanup()
         job = Job(job_id=uuid.uuid4().hex, requested_url=requested_url)
         self.jobs[job.job_id] = job
+        logger.info("Audit %s queued: %s", job.job_id, requested_url)
         asyncio.create_task(self._run(job))
         return job
 
@@ -63,17 +65,32 @@ class JobManager:
         return job
 
     async def _run(self, job: Job) -> None:
+        queued_at = monotonic()
         async with self.audit_slots:
+            queue_wait = monotonic() - queued_at
             try:
                 async with job.lock:
                     job.status = "discovering"
                     job.started_at = utcnow()
 
-                logger.info("Audit %s started: %s", job.job_id, job.requested_url)
+                logger.info(
+                    "Audit %s started after %.3fs queue wait: %s",
+                    job.job_id,
+                    queue_wait,
+                    job.requested_url,
+                )
 
                 async def execute_audit() -> None:
+                    discovery_started = monotonic()
                     discovered = await discover_audit_urls(job.requested_url)
                     urls: list[str] = discovered["urls"]
+                    logger.info(
+                        "Audit %s discovery completed in %.3fs: %s pages, %s sitemap(s)",
+                        job.job_id,
+                        monotonic() - discovery_started,
+                        len(urls),
+                        len(discovered["sitemap_urls"]),
+                    )
 
                     async with job.lock:
                         job.normalized_url = discovered["normalized_url"]
@@ -102,7 +119,16 @@ class JobManager:
                 async with job.lock:
                     job.status = "completed"
                     job.completed_at = utcnow()
-                logger.info("Audit %s completed: %s/%s pages", job.job_id, job.checked_urls, job.discovered_urls)
+                elapsed = (job.completed_at - job.started_at).total_seconds() if job.started_at and job.completed_at else 0.0
+                logger.info(
+                    "Audit %s completed in %.3fs: %s/%s pages, errors=%s, warnings=%s",
+                    job.job_id,
+                    elapsed,
+                    job.checked_urls,
+                    job.discovered_urls,
+                    job.errors_found,
+                    job.warnings_found,
+                )
 
             except asyncio.TimeoutError:
                 logger.error("Audit %s timed out after %.0f seconds: %s", job.job_id, AUDIT_TIMEOUT, job.requested_url)

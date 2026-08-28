@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import logging
 import socket
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from fastapi import HTTPException
 
 from .config import DNS_TIMEOUT
+
+
+logger = logging.getLogger("uvicorn.error")
 
 
 BLOCKED_HOSTNAMES = {
@@ -97,8 +101,10 @@ async def resolve_and_validate_host(url: str) -> list[str]:
             timeout=DNS_TIMEOUT,
         )
     except asyncio.TimeoutError as exc:
+        logger.warning("DNS lookup timed out after %.0fs: %s", DNS_TIMEOUT, hostname)
         raise HTTPException(status_code=504, detail=f"DNS lookup timed out for {hostname}") from exc
     except socket.gaierror as exc:
+        logger.warning("DNS lookup failed: %s", hostname)
         raise HTTPException(status_code=400, detail="Hostname cannot be resolved") from exc
 
     addresses: set[str] = set()
