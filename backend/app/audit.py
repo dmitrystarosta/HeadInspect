@@ -40,7 +40,8 @@ async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
                 url=url,
                 requested_url=url,
                 status_code=None,
-                errors=[f"Страница недоступна: {exc.detail}"],
+                check_failed=True,
+                check_error=f"Не удалось проверить страницу: {exc.detail}",
             )
 
         if result.status_code >= 400:
@@ -115,7 +116,8 @@ async def run_pages(
                 url=url,
                 requested_url=url,
                 status_code=None,
-                errors=[f"Превышено время проверки страницы ({PAGE_TIMEOUT:.0f} с)"],
+                check_failed=True,
+                check_error=f"Страница не ответила за {PAGE_TIMEOUT:.0f} с",
             )
         await on_result(result)
 

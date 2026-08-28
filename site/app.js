@@ -114,6 +114,17 @@ function sizeLabel(og) {
 }
 
 function mapApiRow(page) {
+  if (page.check_failed) {
+    return {
+      status: "unavailable",
+      path: getPath(page.requested_url || page.url),
+      pageUrl: page.url || page.requested_url,
+      message: "Не удалось проверить",
+      issueTitle: "Страница не проверена",
+      issueText: page.check_error || "HeadInspect не смог получить страницу. Это не считается ошибкой сайта.",
+      details: {}
+    };
+  }
   const errors = Array.isArray(page.errors) ? page.errors : [];
   const warnings = Array.isArray(page.warnings) ? page.warnings : [];
   const og = page.open_graph || {};

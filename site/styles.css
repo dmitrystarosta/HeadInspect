@@ -1154,3 +1154,6 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
 .robots-status.error { border-color:#fecaca; background:#fef2f2; }
 .robots-status.error .robots-status-icon { background:#fee2e2; color:var(--error); }
 @media (max-width:760px) { .robots-status { padding:15px; } .robots-status-copy span { font-size:13px; } }
+
+/* Technical fetch failures are neutral: they are not site errors or warnings. */
+.status-unavailable{border-color:#e2e8f0!important;background:#f8fafc!important}.status-unavailable .status-dot{background:#94a3b8!important}.status-unavailable .result-message{color:#64748b!important}

@@ -123,6 +123,17 @@ function unusedMetaHint(value, type) {
 }
 
 function mapApiRow(page) {
+  if (page.check_failed) {
+    return {
+      status: "unavailable",
+      path: getPath(page.requested_url || page.url),
+      pageUrl: page.url || page.requested_url,
+      message: "Не удалось проверить",
+      issueTitle: "URL не проверен",
+      issueText: page.check_error || "HeadInspect не смог получить страницу. Это не считается ошибкой sitemap.",
+      details: { originalUrl: page.requested_url || page.url, finalUrl: page.url || page.requested_url, statusCode: "—", redirected: false }
+    };
+  }
   const originalUrl = page.requested_url || page.url;
   const finalUrl = page.url || originalUrl;
   const pageErrors = Array.isArray(page.errors) ? page.errors : [];

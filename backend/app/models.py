@@ -63,6 +63,8 @@ class PageResult(BaseModel):
     url: str
     requested_url: str | None = None
     status_code: int | None = None
+    check_failed: bool = False
+    check_error: str | None = None
     title: str | None = None
     meta_description: str | None = None
     open_graph: OpenGraphData = Field(default_factory=OpenGraphData)
@@ -98,6 +100,7 @@ class AuditJobStatus(BaseModel):
     progress_percent: int = 0
     errors_found: int = 0
     warnings_found: int = 0
+    failed_checks: int = 0
     created_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -109,4 +112,5 @@ class AuditResultsResponse(BaseModel):
     status: JobStatus
     checked_urls: int
     discovered_urls: int
+    failed_checks: int = 0
     results: list[PageResult] = Field(default_factory=list)

@@ -56,6 +56,7 @@ class Job:
     limited: bool = False
     errors_found: int = 0
     warnings_found: int = 0
+    failed_checks: int = 0
     created_at: datetime = field(default_factory=utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -172,7 +173,9 @@ class JobManager:
                         async with job.lock:
                             job.results.append(result)
                             job.checked_urls += 1
-                            if result.errors:
+                            if result.check_failed:
+                                job.failed_checks += 1
+                            elif result.errors:
                                 job.errors_found += 1
                             elif result.warnings:
                                 job.warnings_found += 1
@@ -271,6 +274,7 @@ class JobManager:
             progress_percent=progress,
             errors_found=job.errors_found,
             warnings_found=job.warnings_found,
+            failed_checks=job.failed_checks,
             created_at=job.created_at,
             started_at=job.started_at,
             completed_at=job.completed_at,
@@ -283,6 +287,7 @@ class JobManager:
             status=job.status,
             checked_urls=job.checked_urls,
             discovered_urls=job.discovered_urls,
+            failed_checks=job.failed_checks,
             results=list(job.results),
         )
 

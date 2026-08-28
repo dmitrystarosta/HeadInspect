@@ -133,6 +133,7 @@ function updateProgress(status) {
 }
 
 function moduleTotals(pages, moduleName) {
+  pages = pages.filter(page => !page.check_failed);
   if (moduleName === "meta") {
     return pages.reduce((totals, page) => {
       const meta = page.meta || {};
@@ -188,18 +189,21 @@ function renderAuditModule(moduleName, pages, status, jobId) {
     }
   }
 
+  const failedChecks = pages.filter(page => page.check_failed).length;
+  const successfullyChecked = pages.length - failedChecks;
   const checkedText = moduleName === "meta"
-    ? `Meta-теги проверены на ${pages.length} страницах.`
+    ? `Meta-теги проверены на ${successfullyChecked} страницах.`
     : moduleName === "schema"
-      ? `Schema.org проверена на ${pages.length} страницах.`
+      ? `Schema.org проверена на ${successfullyChecked} страницах.`
       : moduleName === "sitemap"
-        ? `Sitemap проверен: ${pages.length} URL.`
-        : `Open Graph проверен на ${pages.length} страницах.`;
+        ? `Sitemap проверен: ${successfullyChecked} URL.`
+        : `Open Graph проверен на ${successfullyChecked} страницах.`;
 
   if (bodyText) {
+    const unavailableText = failedChecks ? ` Не удалось проверить: ${failedChecks}. Эти страницы не считаются ошибками сайта.` : "";
     bodyText.textContent = errors || warnings
-      ? `${checkedText} Найдено ошибок: ${errors}, предупреждений: ${warnings}.`
-      : `${checkedText} Ошибок и предупреждений не найдено.`;
+      ? `${checkedText} Найдено ошибок: ${errors}, предупреждений: ${warnings}.${unavailableText}`
+      : `${checkedText} Ошибок и предупреждений не найдено.${unavailableText}`;
   }
 
   if (link && status.normalized_url) {
@@ -223,7 +227,11 @@ function renderAuditModule(moduleName, pages, status, jobId) {
 
 function renderHomeResult(status, results, jobId) {
   const pages = results?.results || [];
-  $("#home-result-total").textContent = status.checked_urls ?? pages.length;
+  const failedChecks = status.failed_checks ?? pages.filter(page => page.check_failed).length;
+  const checkedOk = Math.max(0, (status.checked_urls ?? pages.length) - failedChecks);
+  $("#home-result-total").textContent = checkedOk;
+  const resultSummary = $("#home-result-total")?.parentElement;
+  if (resultSummary && failedChecks) resultSummary.innerHTML = `<strong id="home-result-total">${checkedOk}</strong> страниц проверено · не удалось проверить: ${failedChecks}`;
 
   renderAuditModule("open-graph", pages, status, jobId);
   renderAuditModule("meta", pages, status, jobId);
