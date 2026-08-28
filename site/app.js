@@ -121,7 +121,9 @@ function mapApiRow(page) {
       pageUrl: page.url || page.requested_url,
       message: "Не удалось проверить",
       issueTitle: "Страница не проверена",
-      issueText: page.check_error || "HeadInspect не смог получить страницу. Это не считается ошибкой сайта.",
+      issueText: page.check_error?.startsWith("Страница не ответила за")
+        ? "Страница не ответила за 30 с. Возможно, сервер отвечает слишком медленно или ограничивает частые автоматические запросы."
+        : (page.check_error || "HeadInspect не смог получить страницу."),
       details: {}
     };
   }
@@ -437,6 +439,25 @@ function toggleDetail(item, detailHost, row, button) {
 
   const tpl = $("#detail-template").content.cloneNode(true);
   $(".detail-title", tpl).textContent = row.path;
+
+  if (row.status === "unavailable") {
+    const list = $(".meta-list", tpl);
+    if (list) list.hidden = true;
+    const preview = $(".preview-image", tpl);
+    if (preview) preview.hidden = true;
+    const issueBox = $(".issue-box", tpl);
+    issueBox.className = "issue-box unavailable";
+    issueBox.innerHTML = `<strong>${escapeHtml(row.issueTitle)}</strong><p>${escapeHtml(row.issueText)}</p>`;
+    $(".detail-actions", tpl).innerHTML = row.pageUrl
+      ? `<a href="${escapeAttr(row.pageUrl)}" target="_blank" rel="noopener noreferrer">Открыть страницу ↗</a>`
+      : "";
+    detailHost.innerHTML = "";
+    detailHost.appendChild(tpl);
+    detailHost.hidden = false;
+    item.classList.add("open");
+    button.setAttribute("aria-expanded", "true");
+    return;
+  }
 
   const titleHint = lengthHint(row.details.title, 30, 60, "title");
   const descriptionHint = lengthHint(row.details.description, 120, 160, "description");
