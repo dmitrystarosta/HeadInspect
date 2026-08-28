@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 from app import audit as audit_module
 from app.audit import run_pages
@@ -60,14 +61,32 @@ def test_check_failed_pages_are_excluded_from_duplicate_detection():
 
 async def test_run_pages_stop_event_halts_further_fetches(monkeypatch):
     """Item 9's interaction with audit.py: once stop_event is set, workers
-    that have not started yet must not issue new requests."""
-    fetched = []
+    that have not started yet - or are merely queued behind
+    PAGE_CONCURRENCY, not yet started - must not issue new requests.
 
-    async def fake_analyze_page(url, semaphore):
-        fetched.append(url)
-        return PageResult(url=url, requested_url=url, status_code=200)
+    This exercises the *real* analyze_page (not a fake standing in for it):
+    the actual production bug lived inside analyze_page's semaphore
+    handling, not in run_pages' dispatch loop, and a fake analyze_page with
+    no delay cannot reproduce it (every worker "wins the race" against
+    detection when nothing takes real time). A small artificial delay on
+    the mocked network call is what actually creates the queuing behind
+    PAGE_CONCURRENCY that the real bug depended on.
+    """
+    fetch_calls = []
 
-    monkeypatch.setattr(audit_module, "analyze_page", fake_analyze_page)
+    async def fake_safe_fetch(url, **kwargs):
+        fetch_calls.append(url)
+        await asyncio.sleep(0.02)
+        return SimpleNamespace(
+            url=url, status_code=200, headers={"content-type": "text/html"}, content=b"<html></html>"
+        )
+
+    monkeypatch.setattr(audit_module, "safe_fetch", fake_safe_fetch)
+    # audit.py imported PAGE_CONCURRENCY by value (`from .config import
+    # PAGE_CONCURRENCY`), so the module-level name in audit_module must be
+    # patched directly - patching config_module.PAGE_CONCURRENCY would not
+    # affect the already-bound name run_pages actually uses.
+    monkeypatch.setattr(audit_module, "PAGE_CONCURRENCY", 4)
 
     stop_event = asyncio.Event()
     seen = []
@@ -77,8 +96,20 @@ async def test_run_pages_stop_event_halts_further_fetches(monkeypatch):
         if len(seen) == 3:
             stop_event.set()
 
-    urls = [f"https://example.ru/p{i}" for i in range(20)]
+    # A large URL list matters here: with few URLs, essentially all of them
+    # get dispatched before detection could plausibly fire, so the test
+    # would pass even without the fix. With 200 URLs and PAGE_CONCURRENCY=4,
+    # ~196 workers are queued on the semaphore, not yet fetching, at the
+    # moment stop_event fires - real production behaviour this reproduces.
+    urls = [f"https://example.ru/p{i}" for i in range(200)]
     await run_pages(urls, on_result, stop_event=stop_event)
 
-    assert len(fetched) < 20
     assert len(seen) >= 3
+    # Bounded well below the full URL count: a handful of requests already
+    # in flight (up to PAGE_CONCURRENCY) when detection fires may still
+    # complete, but the other ~196 queued workers must bail out instead of
+    # each making a real request. Generous margin to avoid timing flakiness
+    # while still catching a regression back to "hundreds of requests".
+    assert len(fetch_calls) < 20, (
+        f"expected far fewer than 200 real fetches after stop_event fired, got {len(fetch_calls)}"
+    )

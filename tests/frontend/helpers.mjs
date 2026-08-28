@@ -10,10 +10,27 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SITE_DIR = path.join(__dirname, "..", "..", "site");
 
+function matchesSimpleSelector(el, selector) {
+  // Only what this test suite actually needs: a single ".classname".
+  const m = /^\.([\w-]+)$/.exec(selector.trim());
+  if (!m) return false;
+  return el.classList && el.classList.contains(m[1]);
+}
+
+function queryAllDescendants(root, selector, results) {
+  for (const child of root.children || []) {
+    if (matchesSimpleSelector(child, selector)) results.push(child);
+    queryAllDescendants(child, selector, results);
+  }
+  return results;
+}
+
 export function makeEl(tag) {
   const el = {
     tagName: (tag || "div").toUpperCase(),
     children: [],
+    _parent: null,
+    get parentElement() { return this._parent; },
     classList: {
       _set: new Set(),
       add(...c) { c.forEach(x => this._set.add(x)); },
@@ -35,6 +52,11 @@ export function makeEl(tag) {
     _text: "",
     hidden: false,
     disabled: false,
+    get className() { return [...this.classList._set].join(" "); },
+    set className(v) {
+      this.classList._set.clear();
+      String(v).split(/\s+/).filter(Boolean).forEach(c => this.classList._set.add(c));
+    },
     get textContent() { return this._text; },
     set textContent(v) { this._text = v; },
     get innerHTML() { return this._html || ""; },
@@ -42,15 +64,21 @@ export function makeEl(tag) {
     setAttribute(k, v) { this.attributes[k] = v; },
     getAttribute(k) { return this.attributes[k] !== undefined ? this.attributes[k] : null; },
     addEventListener() {},
-    appendChild(c) { this.children.push(c); return c; },
-    prepend(c) { this.children.unshift(c); return c; },
+    appendChild(c) { c._parent = this; this.children.push(c); return c; },
+    prepend(c) { c._parent = this; this.children.unshift(c); return c; },
     replaceChildren() {},
     cloneNode() { return makeEl(tag); },
     closest() { return null; },
     scrollIntoView() {},
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
-    remove() {},
+    querySelector(sel) { return queryAllDescendants(this, sel, [])[0] || null; },
+    querySelectorAll(sel) { return queryAllDescendants(this, sel, []); },
+    remove() {
+      if (this._parent) {
+        const idx = this._parent.children.indexOf(this);
+        if (idx !== -1) this._parent.children.splice(idx, 1);
+        this._parent = null;
+      }
+    },
   };
   return el;
 }

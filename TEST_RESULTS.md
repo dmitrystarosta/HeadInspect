@@ -1,28 +1,30 @@
 # Результаты автоматических тестов — HeadInspect
 
-Обновлено: 28 августа 2026 (после независимой проверки на реальных
-зависимостях и исправления найденного тестового бага — см.
-`CHANGELOG.md`, раздел "Исправление после независимой проверки").
+Обновлено: 28 августа 2026, вечер (после разбора реальных production-багов
+из `HEADINSPECT_REAL_TEST_BUGS_2026-08-28.md` — см. `CHANGELOG.md`, раздел
+"Обновление от 28.08.2026 (вечер)").
 
-Backend-прогон ниже по-прежнему выполнен через локальные заглушки
-fastapi/httpx/pydantic (в этой среде нет сети для `pip install`), но
-заглушка pydantic была **ужесточена** по итогам независимой проверки:
-теперь она, как и настоящий Pydantic, требует обязательные поля и
-отклоняет `None` для не-`Optional` полей (`str`, `int` и т.д. без
-`| None`). Это именно то поведение, из-за которого настоящий Pydantic
-на реальном окружении нашёл баг в одном тесте — заглушка теперь
-воспроизводит его.
+Оба прогона по-прежнему выполнены мной в среде без сети: backend — через
+локальные заглушки fastapi/httpx/pydantic (описание см. в CHANGELOG),
+frontend — через штатный `node --test` (никаких заглушек не требуется).
 
-Независимая проверка на **настоящих** зависимостях (Python 3.12.10,
-`backend/requirements-dev.txt`, команда `python -m pytest tests -v`)
-дала: **50 passed, 1 failed** — единственное падение было в тесте, не в
-production-коде (см. CHANGELOG). Тест исправлен; итог после
-исправления и повторной проверки заглушками — **53 passed, 0 failed**
-(51 исходных + 2 новых теста, добавленных по итогам этой же проверки —
-см. CHANGELOG).
+Итог: **56 backend + 40 frontend = 96 тестов, 96 пройдено, 0 упало.**
 
-**Просьба повторить настоящий `pytest`-прогон на реальном окружении
-после замены файлов** — ожидаемый результат: **53 passed**.
+Один из сегодняшних тестов (`test_run_pages_stop_event_halts_further_fetches`)
+я специально проверил на способность ловить регресс: временно вернул старую
+(баговую) логику `run_pages`/`analyze_page` и убедился, что тест **падает**
+(200 из 200 запросов вместо ожидаемых <20), затем вернул исправление и
+убедился, что тест снова проходит (4 из 200 запросов). То же самое сделал
+для `site/home.js` и `tests/frontend/job-isolation.test.mjs` — откатил
+исправление статистики, убедился, что новый тест ловит регресс, вернул фикс.
+
+Перед деплоем настоятельно рекомендуется повторить backend-прогон в
+реальном окружении:
+```
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
 
 ---
 
@@ -37,6 +39,12 @@ PASS: test_fetcher_pinning.py::test_safe_fetch_revalidates_and_repins_on_every_r
 === test_global_semaphore.py ===
 PASS: test_global_semaphore.py::test_global_semaphore_caps_real_concurrency_across_many_callers
 PASS: test_global_semaphore.py::test_global_max_concurrent_fetches_equals_page_concurrency_today
+
+=== test_job_isolation.py ===
+Audit job-a-zipkran: site appears to have started blocking HeadInspect mid-audit (HTTP 403), stopping further requests after 40 checked pages, ip=unknown
+PASS: test_job_isolation.py::test_sequential_jobs_do_not_share_any_state
+PASS: test_job_isolation.py::test_job_dataclass_has_no_shared_mutable_defaults
+PASS: test_job_isolation.py::test_job_manager_jobs_dict_keeps_jobs_fully_separate
 
 === test_job_lifecycle.py ===
 PASS: test_job_lifecycle.py::test_get_missing_job_raises_404_with_stable_contract
@@ -106,7 +114,7 @@ PASS: test_www_nonwww.py::test_discover_urls_rejects_unrelated_subdomain_even_wi
 PASS: test_www_nonwww.py::test_discover_audit_urls_uses_entry_pages_actual_redirect_target_as_site_host
 
 
-TOTAL: 53 passed, 0 failed
+TOTAL: 56 passed, 0 failed
 ```
 
 ---
@@ -126,226 +134,250 @@ TAP version 13
 # Subtest: uniqueContentPages: direct page wins over a redirect to the same final URL
 ok 1 - uniqueContentPages: direct page wins over a redirect to the same final URL
   ---
-  duration_ms: 3.451868
+  duration_ms: 2.696758
   type: 'test'
   ...
 # Subtest: uniqueContentPages: keeps first redirect record if no direct record exists
 ok 2 - uniqueContentPages: keeps first redirect record if no direct record exists
   ---
-  duration_ms: 1.156832
+  duration_ms: 1.18554
   type: 'test'
   ...
 # Subtest: uniqueContentPages: check_failed pages are never merged by url
 ok 3 - uniqueContentPages: check_failed pages are never merged by url
   ---
-  duration_ms: 0.878133
+  duration_ms: 0.849673
   type: 'test'
   ...
 # Subtest: uniqueContentPages: pages without a final url are kept separately
 ok 4 - uniqueContentPages: pages without a final url are kept separately
   ---
-  duration_ms: 1.061227
+  duration_ms: 1.036283
   type: 'test'
   ...
 # Subtest: sortRowsForDisplay: home page always first, then by severity, then path
 ok 5 - sortRowsForDisplay: home page always first, then by severity, then path
   ---
-  duration_ms: 2.441997
+  duration_ms: 2.463767
   type: 'test'
   ...
 # Subtest: escapeHtml escapes dangerous characters and keeps an em dash placeholder for empty values
 ok 6 - escapeHtml escapes dangerous characters and keeps an em dash placeholder for empty values
   ---
-  duration_ms: 1.070572
+  duration_ms: 1.123545
   type: 'test'
   ...
 # Subtest: pluralRu picks the correct Russian plural form
 ok 7 - pluralRu picks the correct Russian plural form
   ---
-  duration_ms: 1.134832
+  duration_ms: 1.065478
   type: 'test'
   ...
 # Subtest: apiFetch throws ApiError with the server-provided detail on a non-2xx response
 ok 8 - apiFetch throws ApiError with the server-provided detail on a non-2xx response
   ---
-  duration_ms: 1.396806
+  duration_ms: 1.611193
   type: 'test'
   ...
 # Subtest: apiFetch classifies a 404 with code 'not_found', and isJobNotFound recognizes it
 ok 9 - apiFetch classifies a 404 with code 'not_found', and isJobNotFound recognizes it
   ---
-  duration_ms: 1.522493
+  duration_ms: 1.501441
   type: 'test'
   ...
 # Subtest: apiFetch wraps a network failure (not an AbortError) into a friendly ApiError
 ok 10 - apiFetch wraps a network failure (not an AbortError) into a friendly ApiError
   ---
-  duration_ms: 1.529283
+  duration_ms: 1.397505
   type: 'test'
   ...
 # Subtest: describeError: an ApiError message is shown to the user as-is (item 4)
 ok 11 - describeError: an ApiError message is shown to the user as-is (item 4)
   ---
-  duration_ms: 1.008322
+  duration_ms: 0.92493
   type: 'test'
   ...
 # Subtest: describeError: an unexpected JS error never leaks its raw message to the user (item 4)
 ok 12 - describeError: an unexpected JS error never leaks its raw message to the user (item 4)
   ---
-  duration_ms: 5.357596
+  duration_ms: 4.381892
   type: 'test'
   ...
 # Subtest: describeError returns null for an AbortError (caller should silently stop)
 ok 13 - describeError returns null for an AbortError (caller should silently stop)
   ---
-  duration_ms: 0.886049
+  duration_ms: 0.888495
   type: 'test'
   ...
 # Subtest: pollJobUntilDone resolves once the job reaches 'completed'
 ok 14 - pollJobUntilDone resolves once the job reaches 'completed'
   ---
-  duration_ms: 1823.766353
+  duration_ms: 1804.680585
   type: 'test'
   ...
 # Subtest: pollJobUntilDone resolves on 'completed_partial' too (items 8/9)
 ok 15 - pollJobUntilDone resolves on 'completed_partial' too (items 8/9)
   ---
-  duration_ms: 3.856595
+  duration_ms: 1.64468
   type: 'test'
   ...
 # Subtest: pollJobUntilDone throws when the job status is 'failed'
 ok 16 - pollJobUntilDone throws when the job status is 'failed'
   ---
-  duration_ms: 2.973246
+  duration_ms: 1.047723
   type: 'test'
   ...
 # Subtest: pollJobUntilDone propagates a 404 as an ApiError recognizable via isJobNotFound (item 7)
 ok 17 - pollJobUntilDone propagates a 404 as an ApiError recognizable via isJobNotFound (item 7)
   ---
-  duration_ms: 2.493958
+  duration_ms: 1.011051
   type: 'test'
   ...
 # Subtest: renderAccessBlocked returns false and does nothing for a non-block status
 ok 18 - renderAccessBlocked returns false and does nothing for a non-block status
   ---
-  duration_ms: 2.64009
+  duration_ms: 1.265585
   type: 'test'
   ...
 # Subtest: renderAccessBlocked renders the existing '403 blocked' screen and hides progress
 ok 19 - renderAccessBlocked renders the existing '403 blocked' screen and hides progress
   ---
-  duration_ms: 2.220066
+  duration_ms: 0.930478
   type: 'test'
   ...
 # Subtest: renderJobExpired shows a normal-language message, never the raw API text (item 7)
 ok 20 - renderJobExpired shows a normal-language message, never the raw API text (item 7)
   ---
-  duration_ms: 2.402736
+  duration_ms: 1.049233
   type: 'test'
   ...
 # Subtest: renderPartialNotice only renders for completed_partial and includes the backend's reason (items 8/9)
 ok 21 - renderPartialNotice only renders for completed_partial and includes the backend's reason (items 8/9)
   ---
-  duration_ms: 2.251086
+  duration_ms: 1.093363
+  type: 'test'
+  ...
+# Subtest: renderPartialNotice clears a previous job's banner even when the new job has no notice (regression: stale banner bug)
+ok 22 - renderPartialNotice clears a previous job's banner even when the new job has no notice (regression: stale banner bug)
+  ---
+  duration_ms: 1.033427
+  type: 'test'
+  ...
+# Subtest: renderPartialNotice replaces (not accumulates) the banner across two completed_partial jobs in a row
+ok 23 - renderPartialNotice replaces (not accumulates) the banner across two completed_partial jobs in a row
+  ---
+  duration_ms: 0.994362
+  type: 'test'
+  ...
+# Subtest: sequential jobs: a normal completed job never shows a previous completed_partial job's banner or stats (production incident regression)
+ok 24 - sequential jobs: a normal completed job never shows a previous completed_partial job's banner or stats (production incident regression)
+  ---
+  duration_ms: 5.719032
+  type: 'test'
+  ...
+# Subtest: home stats: one URL with check_failed is counted once, not once per module (unique-URL semantics)
+ok 25 - home stats: one URL with check_failed is counted once, not once per module (unique-URL semantics)
+  ---
+  duration_ms: 5.792117
   type: 'test'
   ...
 # Subtest: app.js mapApiRow: page with no errors/warnings is 'success'
-ok 22 - app.js mapApiRow: page with no errors/warnings is 'success'
+ok 26 - app.js mapApiRow: page with no errors/warnings is 'success'
   ---
-  duration_ms: 6.560628
+  duration_ms: 4.662238
   type: 'test'
   ...
 # Subtest: app.js mapApiRow: a check_failed page becomes 'unavailable' with a friendly message
-ok 23 - app.js mapApiRow: a check_failed page becomes 'unavailable' with a friendly message
+ok 27 - app.js mapApiRow: a check_failed page becomes 'unavailable' with a friendly message
   ---
-  duration_ms: 1.253669
+  duration_ms: 1.448839
   type: 'test'
   ...
 # Subtest: meta.js mapApiRow: errors take priority over warnings
-ok 24 - meta.js mapApiRow: errors take priority over warnings
+ok 28 - meta.js mapApiRow: errors take priority over warnings
   ---
-  duration_ms: 2.264284
+  duration_ms: 1.758574
   type: 'test'
   ...
 # Subtest: schema.js mapApiRow: reports JSON-LD counts in details
-ok 25 - schema.js mapApiRow: reports JSON-LD counts in details
+ok 29 - schema.js mapApiRow: reports JSON-LD counts in details
   ---
-  duration_ms: 2.360364
+  duration_ms: 3.002529
   type: 'test'
   ...
 # Subtest: sitemap.js mapApiRow: a redirected URL is a 'warning', not an 'error'
-ok 26 - sitemap.js mapApiRow: a redirected URL is a 'warning', not an 'error'
+ok 30 - sitemap.js mapApiRow: a redirected URL is a 'warning', not an 'error'
   ---
-  duration_ms: 3.71988
+  duration_ms: 1.887044
   type: 'test'
   ...
 # Subtest: sitemap.js mapApiRow: a non-HTML content-type check_failed is a distinct 'error', not 'unavailable' (regression: image-in-sitemap UX)
-ok 27 - sitemap.js mapApiRow: a non-HTML content-type check_failed is a distinct 'error', not 'unavailable' (regression: image-in-sitemap UX)
+ok 31 - sitemap.js mapApiRow: a non-HTML content-type check_failed is a distinct 'error', not 'unavailable' (regression: image-in-sitemap UX)
   ---
-  duration_ms: 1.442455
+  duration_ms: 1.173337
   type: 'test'
   ...
 # Subtest: sitemap.js mapApiRow: HTTP 4xx on a sitemap URL is an 'error'
-ok 28 - sitemap.js mapApiRow: HTTP 4xx on a sitemap URL is an 'error'
+ok 32 - sitemap.js mapApiRow: HTTP 4xx on a sitemap URL is an 'error'
   ---
-  duration_ms: 7.875499
+  duration_ms: 1.111337
   type: 'test'
   ...
 # Subtest: opening an existing job that no longer exists shows the job-expired screen, not raw API text (item 7)
-ok 29 - opening an existing job that no longer exists shows the job-expired screen, not raw API text (item 7)
+ok 33 - opening an existing job that no longer exists shows the job-expired screen, not raw API text (item 7)
   ---
-  duration_ms: 24.652817
+  duration_ms: 25.962296
   type: 'test'
   ...
 # Subtest: opening an existing completed_partial job renders results plus the partial banner, no exception (items 8/9)
-ok 30 - opening an existing completed_partial job renders results plus the partial banner, no exception (items 8/9)
+ok 34 - opening an existing completed_partial job renders results plus the partial banner, no exception (items 8/9)
   ---
-  duration_ms: 23.547118
+  duration_ms: 22.372979
   type: 'test'
   ...
 # Subtest: opening an existing job whose entry page was access-blocked shows the existing 403 screen unchanged
-ok 31 - opening an existing job whose entry page was access-blocked shows the existing 403 screen unchanged
+ok 35 - opening an existing job whose entry page was access-blocked shows the existing 403 screen unchanged
   ---
-  duration_ms: 21.185825
+  duration_ms: 21.474151
   type: 'test'
   ...
 # Subtest: home.js loads without throwing alongside common.js
-ok 32 - home.js loads without throwing alongside common.js
+ok 36 - home.js loads without throwing alongside common.js
   ---
-  duration_ms: 4.843199
+  duration_ms: 4.312841
   type: 'test'
   ...
 # Subtest: app.js loads without throwing alongside common.js
-ok 33 - app.js loads without throwing alongside common.js
+ok 37 - app.js loads without throwing alongside common.js
   ---
-  duration_ms: 1.682487
+  duration_ms: 1.619459
   type: 'test'
   ...
 # Subtest: meta.js loads without throwing alongside common.js
-ok 34 - meta.js loads without throwing alongside common.js
+ok 38 - meta.js loads without throwing alongside common.js
   ---
-  duration_ms: 1.42871
+  duration_ms: 1.399264
   type: 'test'
   ...
 # Subtest: schema.js loads without throwing alongside common.js
-ok 35 - schema.js loads without throwing alongside common.js
+ok 39 - schema.js loads without throwing alongside common.js
   ---
-  duration_ms: 1.511001
+  duration_ms: 1.46392
   type: 'test'
   ...
 # Subtest: sitemap.js loads without throwing alongside common.js
-ok 36 - sitemap.js loads without throwing alongside common.js
+ok 40 - sitemap.js loads without throwing alongside common.js
   ---
-  duration_ms: 2.942351
+  duration_ms: 2.85296
   type: 'test'
   ...
-1..36
-# tests 36
+1..40
+# tests 40
 # suites 0
-# pass 36
+# pass 40
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 2270.987086
+# duration_ms 2261.287605
 ```

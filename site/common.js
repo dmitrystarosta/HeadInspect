@@ -211,7 +211,27 @@
   // on top of the utilities above.
   function createListProgressUi() {
     const stepAttr = "data-step";
-    const { setStep, resetSteps } = createStepper(stepAttr);
+    const { setStep, resetSteps: resetStepIconsOnly } = createStepper(stepAttr);
+
+    // This module's markup dynamically overwrites the robots/sitemap step
+    // labels (see updateProgressUi below) - unlike the home page's stepper,
+    // whose labels are never mutated. Restore those two specific defaults
+    // on every reset, so a fresh audit never starts by showing a leftover
+    // "robots.txt не найден"/"sitemap не найден" label from a previous job
+    // rendered into this same, reused DOM.
+    const DEFAULT_STEP_LABELS = {
+      robots: " robots.txt найден",
+      sitemap: " sitemap найден",
+    };
+
+    function resetSteps() {
+      resetStepIconsOnly();
+      $$(`.step[${stepAttr}]`).forEach(el => {
+        const name = el.getAttribute(stepAttr);
+        const defaultLabel = DEFAULT_STEP_LABELS[name];
+        if (defaultLabel && el.lastChild) el.lastChild.textContent = defaultLabel;
+      });
+    }
 
     function setProgress(percent) {
       const safe = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -246,6 +266,12 @@
 
       if (status.robots_found === true) {
         setStep("robots", "done");
+        // Explicitly restore the default label: a *previous* job on this
+        // same page (same DOM, reused between jobs) may have overwritten
+        // it with "robots.txt не найден" below, and that must not survive
+        // into a job where robots.txt genuinely was found.
+        const robotsStepOk = $(`.step[${stepAttr}="robots"]`);
+        if (robotsStepOk && robotsStepOk.lastChild) robotsStepOk.lastChild.textContent = " robots.txt найден";
       } else if (status.robots_found === false) {
         setStep("robots", "done");
         const robotsStep = $(`.step[${stepAttr}="robots"]`);
@@ -255,6 +281,9 @@
       const finished = status.status === "running" || status.status === "completed" || status.status === "completed_partial";
       if (status.sitemap_urls && status.sitemap_urls.length) {
         setStep("sitemap", "done");
+        // Same staleness guard as robots.txt above.
+        const sitemapStepOk = $(`.step[${stepAttr}="sitemap"]`);
+        if (sitemapStepOk && sitemapStepOk.lastChild) sitemapStepOk.lastChild.textContent = " sitemap найден";
       } else if (finished) {
         setStep("sitemap", "done");
         const sitemapStep = $(`.step[${stepAttr}="sitemap"]`);
@@ -345,6 +374,15 @@
   // successfully checked and are still shown. The backend already composed
   // a plain-language explanation in `partial_reason` - just display it.
   function renderPartialNotice(resultsCard, status) {
+    // Always clear any banner left over from a *previous* job rendered
+    // into this same, reused DOM element first - job state must never
+    // bleed across jobs. Without this, a site that completes normally
+    // right after a completed_partial job would silently keep showing
+    // the previous job's partial-completion banner, since the early
+    // return below (for a normal "completed" status) would otherwise
+    // never remove it.
+    $$(".hi-partial-banner", resultsCard).forEach(el => el.remove());
+
     if (status.status !== "completed_partial" || !status.partial_reason) return;
     const banner = document.createElement("div");
     banner.className = "issue-box unavailable hi-partial-banner";

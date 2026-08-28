@@ -239,3 +239,33 @@ test("renderPartialNotice only renders for completed_partial and includes the ba
   assert.equal(resultsCard.children.length, 1);
   assert.match(resultsCard.children[0].innerHTML, /Сайт начал ограничивать запросы/);
 });
+
+test("renderPartialNotice clears a previous job's banner even when the new job has no notice (regression: stale banner bug)", () => {
+  const { HI } = setup();
+  const resultsCard = makeEl("div");
+
+  // Job A: completed_partial, banner shown.
+  HI.renderPartialNotice(resultsCard, {
+    status: "completed_partial",
+    partial_reason: "Сайт начал ограничивать автоматические запросы HeadInspect (zipkran.ru).",
+  });
+  assert.equal(resultsCard.children.length, 1);
+
+  // Job B: renders into the SAME resultsCard element (as happens in the
+  // real app - it is never recreated between jobs) and completed normally.
+  HI.renderPartialNotice(resultsCard, { status: "completed", partial_reason: null });
+
+  assert.equal(resultsCard.children.length, 0, "job B's render must not leave job A's banner behind");
+});
+
+test("renderPartialNotice replaces (not accumulates) the banner across two completed_partial jobs in a row", () => {
+  const { HI } = setup();
+  const resultsCard = makeEl("div");
+
+  HI.renderPartialNotice(resultsCard, { status: "completed_partial", partial_reason: "Причина job A" });
+  HI.renderPartialNotice(resultsCard, { status: "completed_partial", partial_reason: "Причина job B" });
+
+  assert.equal(resultsCard.children.length, 1, "must not accumulate multiple banners");
+  assert.match(resultsCard.children[0].innerHTML, /Причина job B/);
+  assert.doesNotMatch(resultsCard.children[0].innerHTML, /Причина job A/);
+});

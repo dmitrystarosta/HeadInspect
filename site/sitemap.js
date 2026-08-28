@@ -270,6 +270,11 @@ function updateRobotsResult(status) {
 // parse it - corrupted gzip, invalid XML, etc. This must be visible, not a
 // silent fallback to "just the entry page was audited".
 function renderSitemapIssues(status) {
+  // Same staleness hazard as HI.renderPartialNotice: always clear a
+  // previous job's leftover banner from this reused resultsCard first,
+  // regardless of whether the current job has any issues to show.
+  $$(".hi-sitemap-issues", resultsCard).forEach(el => el.remove());
+
   const issues = Array.isArray(status?.sitemap_issues) ? status.sitemap_issues : [];
   if (!issues.length) return;
   const box = document.createElement("div");

@@ -25,8 +25,27 @@ logger = logging.getLogger("uvicorn.error")
 ProgressCallback = Callable[[PageResult], Awaitable[None]]
 
 
-async def analyze_page(url: str, semaphore: asyncio.Semaphore) -> PageResult:
+async def analyze_page(
+    url: str,
+    semaphore: asyncio.Semaphore,
+    *,
+    stop_event: asyncio.Event | None = None,
+) -> PageResult | None:
     async with semaphore:
+        # Re-check *after* acquiring the semaphore, not only before. With a
+        # large URL list, every worker's pre-semaphore stop_event check (see
+        # run_pages.worker) can run before a single real fetch has
+        # completed - detection only fires after dozens of genuine
+        # responses come back, which takes real wall-clock time. Without
+        # this second check, hundreds of workers that already passed the
+        # first check end up merely queued on the semaphore, and each one
+        # still makes a real request once its turn comes, long after the
+        # site was already confirmed to be blocking HeadInspect. Returning
+        # None here means "never attempted" - the caller must not count it
+        # anywhere (not checked_urls, not failed_checks, not results).
+        if stop_event is not None and stop_event.is_set():
+            return None
+
         errors: list[str] = []
         warnings: list[str] = []
 
@@ -151,14 +170,13 @@ async def run_pages(
 
     async def worker(url: str) -> None:
         if stop_event is not None and stop_event.is_set():
-            # The site appears to have started blocking HeadInspect (see
-            # JobManager's mid-audit block detection). Do not issue any more
-            # requests for URLs that have not started yet.
+            # Cheap early exit for workers whose turn comes after detection
+            # already fired - avoids even queuing on the semaphore.
             return
 
         try:
             result = await asyncio.wait_for(
-                analyze_page(url, semaphore),
+                analyze_page(url, semaphore, stop_event=stop_event),
                 timeout=PAGE_TIMEOUT,
             )
         except asyncio.TimeoutError:
@@ -170,6 +188,13 @@ async def run_pages(
                 check_failed=True,
                 check_error=f"Страница не ответила за {PAGE_TIMEOUT:.0f} с",
             )
+
+        if result is None:
+            # analyze_page declined to run at all (stop_event fired while
+            # this worker was queued behind PAGE_CONCURRENCY) - genuinely
+            # never attempted, must not be counted anywhere.
+            return
+
         await on_result(result)
 
     await asyncio.gather(*(worker(url) for url in urls))

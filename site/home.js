@@ -165,11 +165,31 @@ function renderAuditModule(moduleName, pages, status, jobId) {
 
 function renderHomeResult(status, results, jobId) {
   const pages = results?.results || [];
-  const failedChecks = status.failed_checks ?? pages.filter(page => page.check_failed).length;
-  const checkedOk = Math.max(0, (status.checked_urls ?? pages.length) - failedChecks);
-  $("#home-result-total").textContent = checkedOk;
+  // Use unique final-URL pages (same de-duplication OG/Meta/Schema already
+  // apply) rather than trusting the backend's raw checked_urls/failed_checks
+  // counters directly: those counters can include pages that were merely
+  // *attempted* (including, historically, extra attempts made right around
+  // a mid-audit block being detected), which is not the same thing as
+  // "unique URLs of this audit that could or couldn't be checked". Deriving
+  // both numbers from the same page list the modules already use keeps the
+  // home page self-consistent with them by construction.
+  const uniquePages = uniqueContentPages(pages);
+  const failedChecks = uniquePages.filter(page => page.check_failed).length;
+  const checkedOk = uniquePages.length - failedChecks;
+
   const resultSummary = $("#home-result-total")?.parentElement;
-  if (resultSummary && failedChecks) resultSummary.innerHTML = `<strong id="home-result-total">${checkedOk}</strong> страниц проверено · не удалось проверить: ${failedChecks}`;
+  if (resultSummary) {
+    // Always rewrite the whole summary line, never only conditionally: a
+    // job with zero failures must not be left showing a previous job's
+    // "не удалось проверить: N" text just because this run had nothing to
+    // add there.
+    resultSummary.innerHTML = failedChecks
+      ? `<strong id="home-result-total">${checkedOk}</strong> страниц проверено · не удалось проверить: ${failedChecks}`
+      : `<strong id="home-result-total">${checkedOk}</strong> страниц проверено`;
+  } else {
+    const totalEl = $("#home-result-total");
+    if (totalEl) totalEl.textContent = checkedOk;
+  }
 
   renderAuditModule("open-graph", pages, status, jobId);
   renderAuditModule("meta", pages, status, jobId);
