@@ -40,6 +40,25 @@ def _format_wait(seconds: int) -> str:
     return f"{seconds} сек"
 
 
+# --- Conservative mid-audit "site started blocking us" heuristic (see
+# JobManager._make_on_result below) --------------------------------------
+#
+# A single 401/403/429 on one page is not evidence the whole site is
+# blocking HeadInspect - some pages are legitimately restricted. But a WAF
+# or anti-bot system that kicks in mid-crawl typically does so abruptly: a
+# long run of normal responses is suddenly followed by a dense, sustained
+# run of 401/403/429 responses. We only act on the latter shape:
+#   - at least BLOCK_DETECT_MIN_GOOD_BEFORE pages must already have been
+#     checked *without* being blocked (proves the site was letting us
+#     through, so this isn't just "this site 403s everything"), and
+#   - at least BLOCK_DETECT_WINDOW of the most recent results must be
+#     401/403/429 at a rate of at least BLOCK_DETECT_RATIO.
+BLOCK_DETECT_WINDOW = 12
+BLOCK_DETECT_MIN_GOOD_BEFORE = 5
+BLOCK_DETECT_RATIO = 0.9
+BLOCK_DETECT_STATUS_CODES = frozenset({401, 403, 429})
+
+
 @dataclass
 class Job:
     job_id: str
@@ -51,6 +70,7 @@ class Job:
     robots_found: bool | None = None
     robots_sitemap_urls: list[str] = field(default_factory=list)
     sitemap_urls: list[str] = field(default_factory=list)
+    sitemap_issues: list[str] = field(default_factory=list)
     discovered_urls: int = 0
     checked_urls: int = 0
     limited: bool = False
@@ -58,10 +78,13 @@ class Job:
     warnings_found: int = 0
     failed_checks: int = 0
     access_blocked_status: int | None = None
+    blocked_mid_audit: bool = False
+    mid_audit_block_status: int | None = None
     created_at: datetime = field(default_factory=utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
     error: str | None = None
+    partial_reason: str | None = None
     results: list[PageResult] = field(default_factory=list)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
@@ -130,6 +153,64 @@ class JobManager:
             raise HTTPException(status_code=404, detail="Audit job not found")
         return job
 
+    @staticmethod
+    def _make_on_result(job: Job, stop_event: asyncio.Event):
+        """Build the on_result callback for a single job run.
+
+        Bundles normal result bookkeeping with the mid-audit block heuristic
+        described above the module-level constants. State (recent_outcomes,
+        good_checks_seen, block_triggered) is private to this one job run.
+        """
+        recent_outcomes: deque[bool] = deque(maxlen=BLOCK_DETECT_WINDOW)
+        state = {"good_checks_seen": 0, "block_triggered": False}
+
+        async def on_result(result: PageResult) -> None:
+            async with job.lock:
+                is_block_response = (
+                    not result.check_failed and result.status_code in BLOCK_DETECT_STATUS_CODES
+                )
+
+                if not state["block_triggered"]:
+                    recent_outcomes.append(is_block_response)
+                    if not is_block_response:
+                        state["good_checks_seen"] += 1
+
+                    if (
+                        state["good_checks_seen"] >= BLOCK_DETECT_MIN_GOOD_BEFORE
+                        and len(recent_outcomes) == BLOCK_DETECT_WINDOW
+                        and sum(recent_outcomes) / BLOCK_DETECT_WINDOW >= BLOCK_DETECT_RATIO
+                    ):
+                        state["block_triggered"] = True
+                        job.blocked_mid_audit = True
+                        job.mid_audit_block_status = result.status_code
+                        logger.warning(
+                            "Audit %s: site appears to have started blocking HeadInspect "
+                            "mid-audit (HTTP %s), stopping further requests after %s checked pages, ip=%s",
+                            job.job_id,
+                            result.status_code,
+                            job.checked_urls,
+                            job.client_ip,
+                        )
+                        stop_event.set()
+
+                if state["block_triggered"] and is_block_response:
+                    # Part of the block storm itself, not a real page error:
+                    # count it as an unavailable check, but do not let it
+                    # inflate errors_found or show up as a normal page result.
+                    job.failed_checks += 1
+                    return
+
+                job.results.append(result)
+                job.checked_urls += 1
+                if result.check_failed:
+                    job.failed_checks += 1
+                elif result.errors:
+                    job.errors_found += 1
+                elif result.warnings:
+                    job.warnings_found += 1
+
+        return on_result
+
     async def _run(self, job: Job) -> None:
         queued_at = monotonic()
         async with self.audit_slots:
@@ -167,6 +248,7 @@ class JobManager:
                         job.robots_found = discovered["robots_found"]
                         job.robots_sitemap_urls = discovered["robots_sitemap_urls"]
                         job.sitemap_urls = discovered["sitemap_urls"]
+                        job.sitemap_issues = discovered.get("sitemap_issues", [])
                         job.discovered_urls = len(urls)
                         job.limited = discovered["limited"]
                         job.access_blocked_status = access_blocked_status
@@ -182,48 +264,74 @@ class JobManager:
                         )
                         return
 
-                    async def on_result(result: PageResult) -> None:
-                        async with job.lock:
-                            job.results.append(result)
-                            job.checked_urls += 1
-                            if result.check_failed:
-                                job.failed_checks += 1
-                            elif result.errors:
-                                job.errors_found += 1
-                            elif result.warnings:
-                                job.warnings_found += 1
+                    stop_event = asyncio.Event()
+                    on_result = self._make_on_result(job, stop_event)
 
-                    await run_pages(urls, on_result)
+                    await run_pages(urls, on_result, stop_event=stop_event)
                     self._apply_meta_duplicate_warnings(job.results)
 
                 await asyncio.wait_for(execute_audit(), timeout=AUDIT_TIMEOUT)
 
                 async with job.lock:
-                    job.status = "completed"
+                    if job.blocked_mid_audit:
+                        job.status = "completed_partial"
+                        job.partial_reason = (
+                            "Сайт начал ограничивать автоматические запросы HeadInspect во время "
+                            f"проверки (сервер стал отвечать HTTP {job.mid_audit_block_status}). "
+                            f"Показаны результаты {job.checked_urls} страниц, проверенных до начала "
+                            "ограничения; остальные страницы не проверялись, чтобы не создавать лишнюю "
+                            "нагрузку на сайт."
+                        )
+                    else:
+                        job.status = "completed"
                     job.completed_at = utcnow()
                 elapsed = (job.completed_at - job.started_at).total_seconds() if job.started_at and job.completed_at else 0.0
                 logger.info(
-                    "Audit %s completed in %.3fs: %s/%s pages, errors=%s, warnings=%s, ip=%s",
+                    "Audit %s completed in %.3fs: %s/%s pages, errors=%s, warnings=%s, blocked_mid_audit=%s, ip=%s",
                     job.job_id,
                     elapsed,
                     job.checked_urls,
                     job.discovered_urls,
                     job.errors_found,
                     job.warnings_found,
+                    job.blocked_mid_audit,
                     job.client_ip,
                 )
 
             except asyncio.TimeoutError:
                 logger.error(
-                    "Audit %s timed out after %.0f seconds: ip=%s url=%s",
+                    "Audit %s timed out after %.0f seconds: ip=%s url=%s, checked=%s",
                     job.job_id,
                     AUDIT_TIMEOUT,
                     job.client_ip,
                     job.requested_url,
+                    job.checked_urls,
                 )
                 async with job.lock:
-                    job.status = "failed"
-                    job.error = f"Проверка заняла больше {int(AUDIT_TIMEOUT)} секунд и была остановлена. Попробуйте ещё раз позже."
+                    if job.checked_urls > 0:
+                        # We already have usable data for some pages - do not
+                        # discard it. Report what we have as a partial result
+                        # instead of a bare failure.
+                        job.status = "completed_partial"
+                        if job.blocked_mid_audit:
+                            job.partial_reason = (
+                                "Сайт начал ограничивать автоматические запросы HeadInspect во время "
+                                f"проверки (сервер стал отвечать HTTP {job.mid_audit_block_status}), а "
+                                f"затем истёк общий лимит времени проверки. Показаны результаты "
+                                f"{job.checked_urls} страниц из {job.discovered_urls} найденных."
+                            )
+                        else:
+                            job.partial_reason = (
+                                f"Проверка заняла больше {int(AUDIT_TIMEOUT)} секунд и была остановлена "
+                                "до завершения. Показаны результаты "
+                                f"{job.checked_urls} страниц из {job.discovered_urls} найденных."
+                            )
+                    else:
+                        job.status = "failed"
+                        job.error = (
+                            f"Проверка заняла больше {int(AUDIT_TIMEOUT)} секунд и была остановлена. "
+                            "Попробуйте ещё раз позже."
+                        )
                     job.completed_at = utcnow()
             except HTTPException as exc:
                 logger.warning("Audit %s failed: %s, ip=%s", job.job_id, exc.detail, job.client_ip)
@@ -278,6 +386,11 @@ class JobManager:
         progress = 0
         if job.status == "completed":
             progress = 100
+        elif job.status == "completed_partial":
+            # Genuinely incomplete: show the real checked/discovered ratio
+            # rather than claiming 100%, but don't get stuck below the
+            # displayed maximum for an in-progress-looking bar either.
+            progress = min(99, round(job.checked_urls / total * 100)) if total > 0 else 100
         elif total > 0:
             progress = min(99, round(job.checked_urls / total * 100))
 
@@ -290,6 +403,7 @@ class JobManager:
             robots_found=job.robots_found,
             robots_sitemap_urls=job.robots_sitemap_urls,
             sitemap_urls=job.sitemap_urls,
+            sitemap_issues=job.sitemap_issues,
             discovered_urls=job.discovered_urls,
             checked_urls=job.checked_urls,
             max_urls=MAX_AUDIT_URLS,
@@ -299,10 +413,13 @@ class JobManager:
             warnings_found=job.warnings_found,
             failed_checks=job.failed_checks,
             access_blocked_status=job.access_blocked_status,
+            blocked_mid_audit=job.blocked_mid_audit,
+            mid_audit_block_status=job.mid_audit_block_status,
             created_at=job.created_at,
             started_at=job.started_at,
             completed_at=job.completed_at,
             error=job.error,
+            partial_reason=job.partial_reason,
         )
 
     def results_model(self, job: Job) -> AuditResultsResponse:

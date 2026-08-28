@@ -74,7 +74,7 @@ class PageResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-JobStatus = Literal["queued", "discovering", "running", "completed", "failed"]
+JobStatus = Literal["queued", "discovering", "running", "completed", "completed_partial", "failed"]
 
 
 class AuditCreateResponse(BaseModel):
@@ -93,6 +93,7 @@ class AuditJobStatus(BaseModel):
     robots_found: bool | None = None
     robots_sitemap_urls: list[str] = Field(default_factory=list)
     sitemap_urls: list[str] = Field(default_factory=list)
+    sitemap_issues: list[str] = Field(default_factory=list)
     discovered_urls: int = 0
     checked_urls: int = 0
     max_urls: int = 500
@@ -102,10 +103,21 @@ class AuditJobStatus(BaseModel):
     warnings_found: int = 0
     failed_checks: int = 0
     access_blocked_status: int | None = None
+    # Set when the site appears to have started blocking HeadInspect's
+    # automated requests partway through the audit (see JobManager's
+    # mid-audit block detection), as opposed to a single page legitimately
+    # returning 401/403/429 on its own.
+    blocked_mid_audit: bool = False
+    mid_audit_block_status: int | None = None
     created_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None
     error: str | None = None
+    # Populated only when status == "completed_partial": a human-readable,
+    # non-alarming explanation of why the audit is incomplete (AUDIT_TIMEOUT
+    # reached, or the site started blocking automated requests), distinct
+    # from `error`, which is reserved for status == "failed".
+    partial_reason: str | None = None
 
 
 class AuditResultsResponse(BaseModel):

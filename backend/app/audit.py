@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
@@ -98,6 +99,7 @@ async def discover_audit_urls(raw_url: str) -> dict:
             "robots_found": None,
             "robots_sitemap_urls": [],
             "sitemap_urls": [],
+            "sitemap_issues": [],
             "urls": [],
             "limited": False,
             "access_blocked_status": entry.status_code,
@@ -106,7 +108,22 @@ async def discover_audit_urls(raw_url: str) -> dict:
     robots_url, robots_found, robots_text = await fetch_robots(normalized)
     robots_sitemaps = sitemap_urls_from_robots(robots_text) if robots_found else []
 
-    urls, processed_sitemaps, limited = await discover_urls(normalized, robots_sitemaps)
+    # Sitemap URLs are matched against the site's *actual* host, not
+    # necessarily the exact host the user typed: if the entry page redirects
+    # example.ru -> www.example.ru (or vice versa) over an ordinary HTTP
+    # redirect, www.example.ru is the site's real host and sitemap entries on
+    # that host must not be discarded as "a different site". This only ever
+    # trusts a host that the entry page itself redirected to (already
+    # revalidated by safe_fetch/resolve_and_validate_host on every hop) - it
+    # does not allow arbitrary same-eTLD+1 subdomains such as shop./forum./
+    # admin.example.ru, which are genuinely different sites.
+    effective_host = urlsplit(entry.url).hostname if entry is not None else urlsplit(normalized).hostname
+
+    urls, processed_sitemaps, limited, sitemap_issues = await discover_urls(
+        normalized,
+        robots_sitemaps,
+        site_host=effective_host,
+    )
 
     if not urls:
         urls = [normalized]
@@ -117,6 +134,7 @@ async def discover_audit_urls(raw_url: str) -> dict:
         "robots_found": robots_found,
         "robots_sitemap_urls": robots_sitemaps,
         "sitemap_urls": processed_sitemaps,
+        "sitemap_issues": sitemap_issues,
         "urls": urls,
         "limited": limited,
         "access_blocked_status": None,
@@ -126,10 +144,18 @@ async def discover_audit_urls(raw_url: str) -> dict:
 async def run_pages(
     urls: list[str],
     on_result: ProgressCallback,
+    *,
+    stop_event: asyncio.Event | None = None,
 ) -> None:
     semaphore = asyncio.Semaphore(PAGE_CONCURRENCY)
 
     async def worker(url: str) -> None:
+        if stop_event is not None and stop_event.is_set():
+            # The site appears to have started blocking HeadInspect (see
+            # JobManager's mid-audit block detection). Do not issue any more
+            # requests for URLs that have not started yet.
+            return
+
         try:
             result = await asyncio.wait_for(
                 analyze_page(url, semaphore),

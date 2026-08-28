@@ -19,6 +19,17 @@ MAX_AUDIT_URLS = 500
 PAGE_CONCURRENCY = 4
 MAX_CONCURRENT_AUDITS = 1
 MAX_QUEUED_AUDITS = 5
+
+# Process-wide cap on simultaneous outbound HTTP requests to third-party
+# sites, across *all* jobs combined (see fetcher.py::_global_fetch_semaphore).
+# Kept equal to PAGE_CONCURRENCY today, which means it has no observable
+# effect while MAX_CONCURRENT_AUDITS == 1 (a single job already can't exceed
+# PAGE_CONCURRENCY concurrent requests). Its purpose is to make a future
+# increase of MAX_CONCURRENT_AUDITS safe: without it, N concurrent jobs would
+# each independently open up to PAGE_CONCURRENCY connections, so total
+# outbound concurrency would grow unbounded with the number of running jobs.
+GLOBAL_MAX_CONCURRENT_FETCHES = PAGE_CONCURRENCY
+
 RATE_LIMIT_AUDITS = 3
 RATE_LIMIT_WINDOW_SECONDS = 2 * 60
 

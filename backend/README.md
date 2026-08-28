@@ -59,3 +59,14 @@ curl http://127.0.0.1:8000/api/audits/JOB_ID/results
 - один тяжёлый аудит одновременно;
 - jobs пока хранятся в RAM и теряются при restart контейнера;
 - до публичного запуска добавить rate limiting и reverse proxy + HTTPS.
+
+## Тесты
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+См. также `../CHANGELOG.md` за 2026-08-28 — там описано, какие тесты
+покрывают что.
+

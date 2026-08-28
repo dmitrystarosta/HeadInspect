@@ -1,8 +1,9 @@
-const API_BASE = "https://api.headinspect.ru";
-const POLL_INTERVAL_MS = 900;
-
-const $ = (selector, ctx = document) => ctx.querySelector(selector);
-const $$ = (selector, ctx = document) => [...ctx.querySelectorAll(selector)];
+const {
+  $, $$, apiFetch, normalizeUrl, escapeHtml, escapeAttr, pluralRu, getPath,
+  setAuditContext, clearAuditContext, createListProgressUi, renderAccessBlocked,
+  renderJobExpired, renderPartialNotice, uniqueContentPages, sortRowsForDisplay,
+  pollJobUntilDone, describeError, isJobNotFound
+} = HI;
 
 const form = $("#audit-form");
 const input = $("#site-url");
@@ -15,72 +16,13 @@ const loadMoreBtn = $("#load-more-btn");
 const emptyState = $("#empty-state");
 const submitBtn = form ? $('button[type="submit"]', form) : null;
 
+const { setStep, resetSteps, updateProgressUi } = createListProgressUi();
+
 let activeFilter = "problems";
 let currentRows = [];
 let visibleLimit = 50;
 let currentJobId = null;
 let pollAbortController = null;
-
-function setAuditContext(jobId, urlValue) {
-  if (!jobId) return;
-  const params = new URLSearchParams({ job: jobId });
-  if (urlValue) params.set("url", urlValue);
-  const query = params.toString();
-  const currentPath = window.location.pathname;
-  window.history.replaceState({}, "", `${currentPath}?${query}`);
-
-  const supportedPaths = new Set(["/", "/open-graph/", "/meta/", "/canonical/", "/schema/", "/images/", "/sitemap/"]);
-  $$(".cross-tool-links a, .main-nav a, .site-header .brand").forEach(link => {
-    const target = new URL(link.getAttribute("href"), window.location.origin);
-    if (target.origin === window.location.origin && supportedPaths.has(target.pathname)) {
-      link.href = `${target.pathname}?${query}${target.hash}`;
-    }
-  });
-}
-
-function clearAuditContext() {
-  window.history.replaceState({}, "", window.location.pathname);
-}
-
-function normalizeUrl(value) {
-  let v = value.trim();
-  if (!v) return null;
-  if (!/^https?:\/\//i.test(v)) v = "https://" + v;
-  try {
-    const url = new URL(v);
-    if (!url.hostname.includes(".")) return null;
-    return url;
-  } catch {
-    return null;
-  }
-}
-
-function setStep(name, state = "done") {
-  const el = $(`.step[data-step="${name}"]`);
-  if (!el) return;
-  el.classList.remove("done", "active");
-  if (state) el.classList.add(state);
-  const icon = $("span", el);
-  if (icon) icon.textContent = state === "done" ? "✓" : state === "active" ? "◉" : "○";
-}
-
-function resetSteps() {
-  $$(".step").forEach(el => {
-    el.classList.remove("done", "active");
-    const icon = $("span", el);
-    if (icon) icon.textContent = "○";
-  });
-}
-
-function setProgress(percent) {
-  const safe = Math.max(0, Math.min(100, Number(percent) || 0));
-  $("#progress-percent").textContent = `${safe}%`;
-  $("#progress-bar").style.width = `${safe}%`;
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 function showFormError(message) {
   formError.textContent = message;
@@ -93,15 +35,6 @@ function setSubmitting(isSubmitting) {
   submitBtn.textContent = isSubmitting ? "Запускаем…" : "Проверить сайт";
 }
 
-function getPath(pageUrl) {
-  try {
-    const u = new URL(pageUrl);
-    return `${u.pathname}${u.search}` || "/";
-  } catch {
-    return pageUrl;
-  }
-}
-
 function bytesLabel(bytes) {
   if (bytes == null) return "—";
   if (bytes < 1024) return `${bytes} B`;
@@ -111,30 +44,6 @@ function bytesLabel(bytes) {
 
 function sizeLabel(og) {
   return og.image_width && og.image_height ? `${og.image_width}×${og.image_height}` : "—";
-}
-
-function uniqueContentPages(pages) {
-  const byFinalUrl = new Map();
-  const withoutFinalUrl = [];
-
-  for (const page of pages || []) {
-    // Не склеиваем неудачные проверки: у них важен именно исходный URL.
-    if (page.check_failed || !page.url) {
-      withoutFinalUrl.push(page);
-      continue;
-    }
-
-    const key = page.url;
-    const existing = byFinalUrl.get(key);
-    const isDirect = !page.requested_url || page.requested_url === page.url;
-    const existingIsDirect = existing && (!existing.requested_url || existing.requested_url === existing.url);
-
-    // Для OG / Meta / Schema одна конечная страница должна выводиться один раз.
-    // Если на неё ведёт редирект, предпочитаем запись самого конечного URL.
-    if (!existing || (isDirect && !existingIsDirect)) byFinalUrl.set(key, page);
-  }
-
-  return [...byFinalUrl.values(), ...withoutFinalUrl];
 }
 
 function mapApiRow(page) {
@@ -186,107 +95,46 @@ function mapApiRow(page) {
   };
 }
 
-async function apiFetch(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
-
-
-  let data = null;
+async function finishAudit(jobId, signal, { trackNormalizedUrl = false } = {}) {
+  let status;
   try {
-    data = await response.json();
-  } catch {
-    // handled below
+    status = await pollJobUntilDone(jobId, {
+      signal,
+      onStatus: s => {
+        updateProgressUi(s);
+        if (trackNormalizedUrl && s.normalized_url) {
+          try {
+            const u = new URL(s.normalized_url);
+            input.value = u.href;
+            $("#audit-host").textContent = u.hostname;
+          } catch {}
+        }
+      }
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    if (isJobNotFound(error)) {
+      renderJobExpired({ progressCard, resultsCard }, {
+        fallbackUrl: input.value || null,
+        onRestart: url => { input.value = url; form?.requestSubmit(); }
+      });
+      return;
+    }
+    throw error;
   }
 
-  if (!response.ok) {
-    const detail = data && data.detail ? data.detail : `Ошибка API (${response.status})`;
-    throw new Error(detail);
-  }
+  if (!status) return;
+  if (renderAccessBlocked({ progressCard, resultsCard }, status)) return;
 
-  return data;
-}
-
-function updateProgressUi(status) {
-  const discovered = status.discovered_urls || 0;
-  const checked = status.checked_urls || 0;
-
-  $("#found-count").textContent = discovered;
-  $("#total-count").textContent = discovered;
-  $("#checked-count").textContent = checked;
-  setProgress(status.progress_percent || 0);
-
-  if (status.normalized_url) setStep("site", "done");
-  else setStep("site", "active");
-
-  if (status.status === "discovering") {
-    setStep("robots", "active");
-    setStep("sitemap", null);
-    setStep("urls", null);
-    setStep("scan", null);
-    return;
-  }
-
-  if (status.robots_found === true) setStep("robots", "done");
-  else if (status.robots_found === false) {
-    setStep("robots", "done");
-    const robotsStep = $('.step[data-step="robots"]');
-    if (robotsStep) robotsStep.lastChild.textContent = " robots.txt не найден";
-  }
-
-  if (status.sitemap_urls && status.sitemap_urls.length) setStep("sitemap", "done");
-  else if (status.status === "running" || status.status === "completed") {
-    setStep("sitemap", "done");
-    const sitemapStep = $('.step[data-step="sitemap"]');
-    if (sitemapStep) sitemapStep.lastChild.textContent = " sitemap не найден — проверена указанная страница";
-  }
-
-  if (discovered > 0) setStep("urls", "done");
-
-  if (status.status === "running") setStep("scan", "active");
-  if (status.status === "completed") {
-    setStep("scan", "done");
-    setProgress(100);
-  }
-}
-
-
-function showAccessBlocked(status) {
-  const code = status.access_blocked_status;
-  if (![401, 403, 429].includes(code)) return false;
-
-  const explanations = {
-    401: "Сервер требует авторизацию и не разрешил HeadInspect получить страницу.",
-    403: "Сервер запретил HeadInspect автоматический доступ. При этом сайт может нормально открываться в обычном браузере.",
-    429: "Сервер ограничил частоту автоматических запросов HeadInspect. Попробуйте повторить проверку позже."
-  };
-
-  progressCard.hidden = true;
-  resultsCard.hidden = false;
-  resultsCard.innerHTML = `
-    <div class="results-head">
-      <div>
-        <div class="section-kicker">РЕЗУЛЬТАТ</div>
-        <h2>Сайт не удалось проверить</h2>
-        <p>Сервер сайта вернул HeadInspect ответ <strong>HTTP ${code}</strong>.</p>
-      </div>
-    </div>
-    <div class="issue-box unavailable">
-      <strong>Проверка остановлена</strong>
-      <p>${explanations[code]}</p>
-      <p>Данные страниц сайта не анализировались, поскольку результаты такой проверки были бы недостоверными.</p>
-    </div>`;
-  resultsCard.scrollIntoView({ behavior: "smooth", block: "start" });
-  return true;
+  const data = await apiFetch(`/api/audits/${jobId}/results`, { signal });
+  currentRows = sortRowsForDisplay(uniqueContentPages(data.results || []).map(mapApiRow));
+  showResults(currentRows.length, status);
 }
 
 async function startAudit(url) {
   if (pollAbortController) pollAbortController.abort();
   pollAbortController = new AbortController();
+  const signal = pollAbortController.signal;
 
   workspace.hidden = false;
   resultsCard.hidden = true;
@@ -296,69 +144,27 @@ async function startAudit(url) {
   currentRows = [];
   currentJobId = null;
   resetSteps();
-  setProgress(0);
+  updateProgressUi({ status: "queued", discovered_urls: 0, checked_urls: 0, progress_percent: 0, normalized_url: null });
   $("#audit-host").textContent = url.hostname;
-  $("#found-count").textContent = "0";
-  $("#checked-count").textContent = "0";
-  $("#total-count").textContent = "0";
   setStep("site", "active");
 
   const created = await apiFetch("/api/audits", {
     method: "POST",
     body: JSON.stringify({ url: url.href }),
-    signal: pollAbortController.signal
+    signal
   });
 
   currentJobId = created.job_id;
   setAuditContext(currentJobId, url.href);
   setSubmitting(false);
 
-  while (true) {
-    if (pollAbortController.signal.aborted) return;
-
-    const status = await apiFetch(`/api/audits/${currentJobId}`, {
-      signal: pollAbortController.signal
-    });
-    updateProgressUi(status);
-
-    if (status.status === "failed") {
-      throw new Error(status.error || "Не удалось выполнить аудит.");
-    }
-
-    if (status.status === "completed") {
-      if (showAccessBlocked(status)) return;
-      const data = await apiFetch(`/api/audits/${currentJobId}/results`, {
-        signal: pollAbortController.signal
-      });
-      currentRows = sortRowsForDisplay(uniqueContentPages(data.results || []).map(mapApiRow));
-      showResults(currentRows.length);
-      return;
-    }
-
-    await sleep(POLL_INTERVAL_MS);
-  }
+  await finishAudit(currentJobId, signal);
 }
-
-
-function sortRowsForDisplay(rows) {
-  const severityRank = { error: 0, warning: 1, success: 2 };
-
-  return [...rows].sort((a, b) => {
-    // The home page is always the most important row.
-    if (a.path === "/" && b.path !== "/") return -1;
-    if (b.path === "/" && a.path !== "/") return 1;
-
-    const severityDiff = (severityRank[a.status] ?? 9) - (severityRank[b.status] ?? 9);
-    if (severityDiff !== 0) return severityDiff;
-
-    return a.path.localeCompare(b.path, "ru", { numeric: true, sensitivity: "base" });
-  });
-}
-
 
 async function openExistingAudit(jobId, fallbackUrl = null) {
   if (pollAbortController) pollAbortController.abort();
   pollAbortController = new AbortController();
+  const signal = pollAbortController.signal;
 
   currentJobId = jobId;
   setAuditContext(jobId, fallbackUrl);
@@ -366,7 +172,7 @@ async function openExistingAudit(jobId, fallbackUrl = null) {
   resultsCard.hidden = true;
   progressCard.hidden = false;
   resetSteps();
-  setProgress(0);
+  updateProgressUi({ status: "queued", discovered_urls: 0, checked_urls: 0, progress_percent: 0, normalized_url: null });
 
   if (fallbackUrl) {
     try {
@@ -379,43 +185,13 @@ async function openExistingAudit(jobId, fallbackUrl = null) {
 
   workspace.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  while (true) {
-    if (pollAbortController.signal.aborted) return;
-
-    const status = await apiFetch(`/api/audits/${jobId}`, {
-      signal: pollAbortController.signal
-    });
-    updateProgressUi(status);
-
-    if (status.normalized_url) {
-      try {
-        const u = new URL(status.normalized_url);
-        input.value = u.href;
-        $("#audit-host").textContent = u.hostname;
-      } catch {}
-    }
-
-    if (status.status === "failed") {
-      throw new Error(status.error || "Не удалось выполнить аудит.");
-    }
-
-    if (status.status === "completed") {
-      if (showAccessBlocked(status)) return;
-      const data = await apiFetch(`/api/audits/${jobId}/results`, {
-        signal: pollAbortController.signal
-      });
-      currentRows = sortRowsForDisplay(uniqueContentPages(data.results || []).map(mapApiRow));
-      showResults(currentRows.length);
-      return;
-    }
-
-    await sleep(POLL_INTERVAL_MS);
-  }
+  await finishAudit(jobId, signal, { trackNormalizedUrl: true });
 }
 
-function showResults(total) {
+function showResults(total, status) {
   progressCard.hidden = true;
   resultsCard.hidden = false;
+  if (status) renderPartialNotice(resultsCard, status);
 
   const errors = currentRows.filter(r => r.status === "error").length;
   const warnings = currentRows.filter(r => r.status === "warning").length;
@@ -601,21 +377,6 @@ function lengthHint(value, min, max, label) {
   };
 }
 
-function pluralRu(n, one, few, many) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "—").replace(/[&<>"']/g, ch => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-  }[ch]));
-}
-function escapeAttr(value) { return escapeHtml(value); }
-
 if (form) {
   form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -632,10 +393,11 @@ if (form) {
     try {
       await startAudit(url);
     } catch (error) {
-      if (error && error.name === "AbortError") return;
+      const message = describeError(error, "Не удалось запустить проверку. Попробуйте позже.");
+      if (message === null) return; // aborted
       progressCard.hidden = true;
       workspace.hidden = false;
-      showFormError(error?.message || "Не удалось запустить проверку. Попробуйте позже.");
+      showFormError(message);
       workspace.hidden = true;
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
@@ -719,8 +481,10 @@ if (form && input && initialJob) {
     try {
       await openExistingAudit(initialJob, initialUrl);
     } catch (error) {
+      const message = describeError(error, "Не удалось открыть результаты аудита.");
+      if (message === null) return; // aborted
       workspace.hidden = true;
-      showFormError(error?.message || "Не удалось открыть результаты аудита.");
+      showFormError(message);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, 0);

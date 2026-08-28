@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import gzip
 from collections import deque
+from io import BytesIO
 from urllib.parse import urljoin, urlsplit
 import xml.etree.ElementTree as ET
 
@@ -11,37 +13,90 @@ from .fetcher import safe_fetch
 from .security import validate_public_url
 
 
+GZIP_MAGIC = b"\x1f\x8b"
+
+# A gzip-compressed sitemap can already only reach us as at most
+# MAX_SITEMAP_BYTES of compressed bytes (enforced by safe_fetch), but gzip
+# can still compress a hostile payload far beyond that once decompressed
+# ("gzip bomb"). Cap the decompressed size generously but firmly so a
+# malicious/broken sitemap.xml.gz cannot exhaust memory.
+MAX_SITEMAP_DECOMPRESSED_BYTES = MAX_SITEMAP_BYTES * 10
+
+
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1].lower()
 
 
+def _maybe_decompress_gzip(content: bytes) -> bytes:
+    """Transparently decompress a gzip-compressed sitemap.
+
+    Detection is based on the gzip magic bytes rather than the HTTP
+    Content-Type header: real-world servers advertise sitemap.xml.gz under a
+    variety of types (application/gzip, application/x-gzip, application/
+    octet-stream, or even text/xml with a misconfigured proxy), so relying on
+    Content-Type alone silently misses valid gzip sitemaps.
+    """
+    if not content[:2] == GZIP_MAGIC:
+        return content
+
+    try:
+        with gzip.GzipFile(fileobj=BytesIO(content)) as gz:
+            decompressed = gz.read(MAX_SITEMAP_DECOMPRESSED_BYTES + 1)
+    except OSError as exc:
+        # A real, explainable failure (corrupted archive, truncated stream,
+        # not actually gzip despite the magic bytes) - must not be swallowed
+        # into a silent fallback, per the incident this fixes.
+        raise HTTPException(
+            status_code=502,
+            detail="Sitemap is gzip-compressed but could not be decompressed (corrupted archive)",
+        ) from exc
+
+    if len(decompressed) > MAX_SITEMAP_DECOMPRESSED_BYTES:
+        raise HTTPException(status_code=502, detail="Sitemap gzip archive is too large after decompression")
+
+    return decompressed
+
+
 def _parse_sitemap_xml(content: bytes) -> tuple[str, list[str]]:
+    content = _maybe_decompress_gzip(content)
+
     try:
         root = ET.fromstring(content)
     except ET.ParseError as exc:
         raise HTTPException(status_code=502, detail="Invalid sitemap XML") from exc
 
     root_name = _local_name(root.tag)
+    if root_name not in {"sitemapindex", "urlset"}:
+        raise HTTPException(status_code=502, detail="Unsupported sitemap XML root element")
+
+    # Only a <loc> that is a *direct* child of a <url> (urlset) or <sitemap>
+    # (sitemapindex) entry is a page/sitemap reference per sitemaps.org.
+    # Extension namespaces such as <image:image><image:loc> or
+    # <video:video><video:loc> nest their own <loc> one level deeper, under a
+    # child element, so this never picks them up - image/video URLs must not
+    # be treated as pages to audit.
+    entry_name = "sitemap" if root_name == "sitemapindex" else "url"
     locs: list[str] = []
+    for entry in root:
+        if _local_name(entry.tag) != entry_name:
+            continue
+        for child in entry:
+            if _local_name(child.tag) == "loc" and child.text:
+                value = child.text.strip()
+                if value:
+                    locs.append(value)
+                break  # sitemaps.org specifies exactly one <loc> per entry
 
-    for node in root.iter():
-        if _local_name(node.tag) == "loc" and node.text:
-            value = node.text.strip()
-            if value:
-                locs.append(value)
-
-    if root_name == "sitemapindex":
-        return "index", locs
-    if root_name == "urlset":
-        return "urlset", locs
-
-    raise HTTPException(status_code=502, detail="Unsupported sitemap XML root element")
+    kind = "index" if root_name == "sitemapindex" else "urlset"
+    return kind, locs
 
 
 async def discover_urls(
     site_url: str,
     initial_sitemaps: list[str],
-) -> tuple[list[str], list[str], bool]:
+    *,
+    site_host: str | None = None,
+) -> tuple[list[str], list[str], bool, list[str]]:
     if not initial_sitemaps:
         initial_sitemaps = [
             urljoin(site_url, "/sitemap.xml"),
@@ -54,8 +109,10 @@ async def discover_urls(
     pages: list[str] = []
     seen_pages: set[str] = set()
     limited = False
+    issues: list[str] = []
 
-    site_host = urlsplit(site_url).hostname
+    if site_host is None:
+        site_host = urlsplit(site_url).hostname
 
     while queue and len(seen_sitemaps) < MAX_SITEMAPS:
         sitemap_url, depth = queue.popleft()
@@ -65,6 +122,8 @@ async def discover_urls(
         try:
             sitemap_url = await validate_public_url(sitemap_url)
         except HTTPException:
+            # Not a valid/allowed URL at all - nothing was ever fetched, so
+            # there is nothing meaningful to report to the user.
             continue
 
         if sitemap_url in seen_sitemaps:
@@ -75,9 +134,13 @@ async def discover_urls(
             result = await safe_fetch(
                 sitemap_url,
                 max_bytes=MAX_SITEMAP_BYTES,
-                accepted_content_types=("xml", "text/plain", "application/octet-stream"),
+                accepted_content_types=("xml", "text/plain", "application/octet-stream", "gzip"),
             )
         except HTTPException:
+            # A sitemap candidate that couldn't even be fetched (404, DNS
+            # error, timeout, etc.) is an extremely common, expected outcome
+            # for the guessed default locations - reporting every miss would
+            # be noise, not signal.
             continue
 
         if result.status_code != 200:
@@ -85,7 +148,12 @@ async def discover_urls(
 
         try:
             kind, locs = _parse_sitemap_xml(result.content)
-        except HTTPException:
+        except HTTPException as exc:
+            # Unlike the cases above, this sitemap URL *did* answer with a
+            # 200 and a body - it exists, but HeadInspect could not parse it
+            # (corrupted gzip, invalid XML, unsupported root element). This
+            # must not fall back to auditing a single page silently.
+            issues.append(f"{sitemap_url}: {exc.detail}")
             continue
 
         processed_sitemaps.append(result.url)
@@ -111,9 +179,9 @@ async def discover_urls(
 
             if len(pages) >= MAX_AUDIT_URLS:
                 limited = True
-                return pages, processed_sitemaps, limited
+                return pages, processed_sitemaps, limited, issues
 
             seen_pages.add(normalized)
             pages.append(normalized)
 
-    return pages, processed_sitemaps, limited
+    return pages, processed_sitemaps, limited, issues
