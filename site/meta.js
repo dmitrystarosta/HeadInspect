@@ -121,6 +121,30 @@ function metaHint(value, type) {
   return { text: "указано", state: "ok" };
 }
 
+function uniqueContentPages(pages) {
+  const byFinalUrl = new Map();
+  const withoutFinalUrl = [];
+
+  for (const page of pages || []) {
+    // Не склеиваем неудачные проверки: у них важен именно исходный URL.
+    if (page.check_failed || !page.url) {
+      withoutFinalUrl.push(page);
+      continue;
+    }
+
+    const key = page.url;
+    const existing = byFinalUrl.get(key);
+    const isDirect = !page.requested_url || page.requested_url === page.url;
+    const existingIsDirect = existing && (!existing.requested_url || existing.requested_url === existing.url);
+
+    // Для OG / Meta / Schema одна конечная страница должна выводиться один раз.
+    // Если на неё ведёт редирект, предпочитаем запись самого конечного URL.
+    if (!existing || (isDirect && !existingIsDirect)) byFinalUrl.set(key, page);
+  }
+
+  return [...byFinalUrl.values(), ...withoutFinalUrl];
+}
+
 function mapApiRow(page) {
   if (page.check_failed) {
     return {
@@ -280,7 +304,7 @@ async function startAudit(url) {
       const data = await apiFetch(`/api/audits/${currentJobId}/results`, {
         signal: pollAbortController.signal
       });
-      currentRows = sortRowsForDisplay((data.results || []).map(mapApiRow));
+      currentRows = sortRowsForDisplay(uniqueContentPages(data.results || []).map(mapApiRow));
       showResults(currentRows.length);
       return;
     }
@@ -353,7 +377,7 @@ async function openExistingAudit(jobId, fallbackUrl = null) {
       const data = await apiFetch(`/api/audits/${jobId}/results`, {
         signal: pollAbortController.signal
       });
-      currentRows = sortRowsForDisplay((data.results || []).map(mapApiRow));
+      currentRows = sortRowsForDisplay(uniqueContentPages(data.results || []).map(mapApiRow));
       showResults(currentRows.length);
       return;
     }

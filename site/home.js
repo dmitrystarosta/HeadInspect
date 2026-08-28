@@ -132,7 +132,31 @@ function updateProgress(status) {
   }
 }
 
+function uniqueContentPages(pages) {
+  const byFinalUrl = new Map();
+  const withoutFinalUrl = [];
+
+  for (const page of pages || []) {
+    if (page.check_failed || !page.url) {
+      withoutFinalUrl.push(page);
+      continue;
+    }
+
+    const key = page.url;
+    const existing = byFinalUrl.get(key);
+    const isDirect = !page.requested_url || page.requested_url === page.url;
+    const existingIsDirect = existing && (!existing.requested_url || existing.requested_url === existing.url);
+
+    if (!existing || (isDirect && !existingIsDirect)) byFinalUrl.set(key, page);
+  }
+
+  return [...byFinalUrl.values(), ...withoutFinalUrl];
+}
+
 function moduleTotals(pages, moduleName) {
+  // Sitemap работает с каждым URL из карты сайта, включая редиректы.
+  // Контентные модули считают каждую конечную страницу только один раз.
+  if (moduleName !== "sitemap") pages = uniqueContentPages(pages);
   pages = pages.filter(page => !page.check_failed);
   if (moduleName === "meta") {
     return pages.reduce((totals, page) => {
