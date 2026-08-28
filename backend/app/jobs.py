@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -8,8 +9,11 @@ import uuid
 from fastapi import HTTPException
 
 from .audit import discover_audit_urls, run_pages
-from .config import JOB_TTL_SECONDS, MAX_AUDIT_URLS, MAX_CONCURRENT_AUDITS
+from .config import AUDIT_TIMEOUT, JOB_TTL_SECONDS, MAX_AUDIT_URLS, MAX_CONCURRENT_AUDITS
 from .models import AuditJobStatus, AuditResultsResponse, JobStatus, PageResult
+
+
+logger = logging.getLogger(__name__)
 
 
 def utcnow() -> datetime:
@@ -65,42 +69,55 @@ class JobManager:
                     job.status = "discovering"
                     job.started_at = utcnow()
 
-                discovered = await discover_audit_urls(job.requested_url)
-                urls: list[str] = discovered["urls"]
+                logger.info("Audit %s started: %s", job.job_id, job.requested_url)
 
-                async with job.lock:
-                    job.normalized_url = discovered["normalized_url"]
-                    job.robots_url = discovered["robots_url"]
-                    job.robots_found = discovered["robots_found"]
-                    job.robots_sitemap_urls = discovered["robots_sitemap_urls"]
-                    job.sitemap_urls = discovered["sitemap_urls"]
-                    job.discovered_urls = len(urls)
-                    job.limited = discovered["limited"]
-                    job.status = "running"
+                async def execute_audit() -> None:
+                    discovered = await discover_audit_urls(job.requested_url)
+                    urls: list[str] = discovered["urls"]
 
-                async def on_result(result: PageResult) -> None:
                     async with job.lock:
-                        job.results.append(result)
-                        job.checked_urls += 1
-                        if result.errors:
-                            job.errors_found += 1
-                        elif result.warnings:
-                            job.warnings_found += 1
+                        job.normalized_url = discovered["normalized_url"]
+                        job.robots_url = discovered["robots_url"]
+                        job.robots_found = discovered["robots_found"]
+                        job.robots_sitemap_urls = discovered["robots_sitemap_urls"]
+                        job.sitemap_urls = discovered["sitemap_urls"]
+                        job.discovered_urls = len(urls)
+                        job.limited = discovered["limited"]
+                        job.status = "running"
 
-                await run_pages(urls, on_result)
+                    async def on_result(result: PageResult) -> None:
+                        async with job.lock:
+                            job.results.append(result)
+                            job.checked_urls += 1
+                            if result.errors:
+                                job.errors_found += 1
+                            elif result.warnings:
+                                job.warnings_found += 1
 
-                self._apply_meta_duplicate_warnings(job.results)
+                    await run_pages(urls, on_result)
+                    self._apply_meta_duplicate_warnings(job.results)
+
+                await asyncio.wait_for(execute_audit(), timeout=AUDIT_TIMEOUT)
 
                 async with job.lock:
                     job.status = "completed"
                     job.completed_at = utcnow()
+                logger.info("Audit %s completed: %s/%s pages", job.job_id, job.checked_urls, job.discovered_urls)
 
+            except asyncio.TimeoutError:
+                logger.error("Audit %s timed out after %.0f seconds: %s", job.job_id, AUDIT_TIMEOUT, job.requested_url)
+                async with job.lock:
+                    job.status = "failed"
+                    job.error = f"Превышено максимальное время аудита ({AUDIT_TIMEOUT / 60:.0f} мин)"
+                    job.completed_at = utcnow()
             except HTTPException as exc:
+                logger.warning("Audit %s failed: %s", job.job_id, exc.detail)
                 async with job.lock:
                     job.status = "failed"
                     job.error = str(exc.detail)
                     job.completed_at = utcnow()
             except Exception:
+                logger.exception("Audit %s failed with unexpected error", job.job_id)
                 async with job.lock:
                     job.status = "failed"
                     job.error = "Audit failed"

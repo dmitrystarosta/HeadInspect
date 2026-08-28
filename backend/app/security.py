@@ -7,6 +7,8 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from fastapi import HTTPException
 
+from .config import DNS_TIMEOUT
+
 
 BLOCKED_HOSTNAMES = {
     "localhost",
@@ -86,11 +88,16 @@ async def resolve_and_validate_host(url: str) -> list[str]:
 
     loop = asyncio.get_running_loop()
     try:
-        infos = await loop.getaddrinfo(
-            hostname,
-            parts.port or (443 if parts.scheme == "https" else 80),
-            type=socket.SOCK_STREAM,
+        infos = await asyncio.wait_for(
+            loop.getaddrinfo(
+                hostname,
+                parts.port or (443 if parts.scheme == "https" else 80),
+                type=socket.SOCK_STREAM,
+            ),
+            timeout=DNS_TIMEOUT,
         )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail=f"DNS lookup timed out for {hostname}") from exc
     except socket.gaierror as exc:
         raise HTTPException(status_code=400, detail="Hostname cannot be resolved") from exc
 

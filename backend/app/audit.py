@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from .analyzers.meta import analyze_meta
 from .analyzers.open_graph import analyze_open_graph
 from .analyzers.schema import analyze_schema
-from .config import MAX_HTML_BYTES, PAGE_CONCURRENCY
+from .config import MAX_HTML_BYTES, PAGE_CONCURRENCY, PAGE_TIMEOUT
 from .fetcher import safe_fetch
 from .htmlmeta import MetadataParser
 from .models import PageResult
@@ -100,7 +100,18 @@ async def run_pages(
     semaphore = asyncio.Semaphore(PAGE_CONCURRENCY)
 
     async def worker(url: str) -> None:
-        result = await analyze_page(url, semaphore)
+        try:
+            result = await asyncio.wait_for(
+                analyze_page(url, semaphore),
+                timeout=PAGE_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            result = PageResult(
+                url=url,
+                requested_url=url,
+                status_code=None,
+                errors=[f"Превышено время проверки страницы ({PAGE_TIMEOUT:.0f} с)"],
+            )
         await on_result(result)
 
     await asyncio.gather(*(worker(url) for url in urls))
