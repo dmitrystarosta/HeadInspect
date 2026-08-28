@@ -387,9 +387,16 @@ function showResults(total) {
   const errors = currentRows.filter(r => r.status === "error").length;
   const warnings = currentRows.filter(r => r.status === "warning").length;
   const ok = currentRows.filter(r => r.status === "success").length;
+  const unavailable = currentRows.filter(r => r.status === "unavailable").length;
+  const checked = total - unavailable;
   const problems = errors + warnings;
 
-  $("#result-total").textContent = total;
+  $("#result-total").textContent = checked;
+  const unavailableSummary = $("#result-unavailable-summary");
+  if (unavailableSummary) {
+    unavailableSummary.hidden = unavailable === 0;
+    $("#result-unavailable").textContent = unavailable;
+  }
   $("#count-errors").textContent = errors;
   $("#count-warnings").textContent = warnings;
   $("#count-ok").textContent = ok;
@@ -398,6 +405,7 @@ function showResults(total) {
   $("#tab-problems").textContent = problems;
   $("#tab-errors").textContent = errors;
   $("#tab-warnings").textContent = warnings;
+  $("#tab-unavailable").textContent = unavailable;
   $("#tab-ok").textContent = ok;
   $("#tab-all").textContent = total;
 
@@ -410,7 +418,7 @@ function showResults(total) {
 }
 
 function getFilteredRows() {
-  if (activeFilter === "problems") return currentRows.filter(row => row.status !== "success");
+  if (activeFilter === "problems") return currentRows.filter(row => row.status === "error" || row.status === "warning");
   if (activeFilter === "all") return currentRows;
   return currentRows.filter(row => row.status === activeFilter);
 }

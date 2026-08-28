@@ -204,7 +204,7 @@
             <div>
               <div class="section-kicker">РЕЗУЛЬТАТ</div>
               <h2>Проверка завершена</h2>
-              <p><strong id="result-total">0</strong> страниц проверено</p>
+              <p><strong id="result-total">0</strong> страниц проверено<span id="result-unavailable-summary" hidden> · Не удалось проверить: <strong id="result-unavailable">0</strong></span></p>
             </div>
             <div class="results-actions">
               <button id="download-btn" class="secondary-btn" type="button" title="Экспорт Excel — следующий этап">Скачать Excel</button>
@@ -248,6 +248,7 @@
               <button class="filter-tab active" data-filter="problems" type="button">Проблемы <span id="tab-problems">0</span></button>
               <button class="filter-tab" data-filter="error" type="button">Ошибки <span id="tab-errors">0</span></button>
               <button class="filter-tab" data-filter="warning" type="button">Предупреждения <span id="tab-warnings">0</span></button>
+              <button class="filter-tab" data-filter="unavailable" type="button">Без ответа <span id="tab-unavailable">0</span></button>
               <button class="filter-tab" data-filter="success" type="button">OK <span id="tab-ok">0</span></button>
               <button class="filter-tab" data-filter="all" type="button">Все <span id="tab-all">0</span></button>
             </div>
