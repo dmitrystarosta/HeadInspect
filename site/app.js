@@ -443,8 +443,8 @@ function toggleDetail(item, detailHost, row, button) {
   if (row.status === "unavailable") {
     const list = $(".meta-list", tpl);
     if (list) list.hidden = true;
-    const preview = $(".preview-image", tpl);
-    if (preview) preview.hidden = true;
+    const previewBox = $(".preview-box", tpl);
+    if (previewBox) previewBox.hidden = true;
     const issueBox = $(".issue-box", tpl);
     issueBox.className = "issue-box unavailable";
     issueBox.innerHTML = `<strong>${escapeHtml(row.issueTitle)}</strong><p>${escapeHtml(row.issueText)}</p>`;
