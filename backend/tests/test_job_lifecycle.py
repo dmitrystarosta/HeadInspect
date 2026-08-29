@@ -109,9 +109,18 @@ async def test_single_blocked_page_does_not_stop_the_whole_audit(monkeypatch):
 
     async def fake_run_pages(urls_, on_result, *, stop_event=None):
         for i, u in enumerate(urls_):
-            status = 403 if i == 3 else 200
-            errors = ["HTTP 403"] if status == 403 else []
-            await on_result(PageResult(url=u, requested_url=u, status_code=status, errors=errors))
+            # Mirrors what the real analyze_page (app/audit.py) now produces
+            # for a 401/403/429 response: check_failed=True with
+            # check_reason="access_blocked", no invented content-analysis
+            # errors. Keeping this fixture in sync with the real function is
+            # exactly the lesson from the earlier fixture-drift incident.
+            if i == 3:
+                await on_result(PageResult(
+                    url=u, requested_url=u, status_code=403,
+                    check_failed=True, check_reason="access_blocked",
+                ))
+            else:
+                await on_result(PageResult(url=u, requested_url=u, status_code=200))
 
     monkeypatch.setattr(jobs_module, "discover_audit_urls", fake_discover_audit_urls)
     monkeypatch.setattr(jobs_module, "run_pages", fake_run_pages)
@@ -123,7 +132,10 @@ async def test_single_blocked_page_does_not_stop_the_whole_audit(monkeypatch):
     assert job.status == "completed"
     assert job.blocked_mid_audit is False
     assert job.checked_urls == 10
-    assert job.errors_found == 1
+    # The blocked page is check_failed=True now, not a content-analysis
+    # error - see comment above.
+    assert job.errors_found == 0
+    assert job.failed_checks == 1
 
 
 async def test_entry_page_access_blocked_still_stops_before_any_page_checks(monkeypatch):

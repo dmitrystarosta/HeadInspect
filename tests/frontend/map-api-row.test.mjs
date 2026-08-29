@@ -34,10 +34,12 @@ test("app.js mapApiRow: a check_failed page becomes 'unavailable' with a friendl
   const mapApiRow = extractMapApiRow("app.js");
   const row = mapApiRow({
     check_failed: true,
+    check_reason: "timeout",
     requested_url: "https://example.ru/slow",
     check_error: "Страница не ответила за 30 с",
   });
   assert.equal(row.status, "unavailable");
+  assert.equal(row.message, "Не ответила за 30 с");
   assert.match(row.issueText, /Возможно, сервер отвечает слишком медленно/);
 });
 
@@ -49,6 +51,34 @@ test("meta.js mapApiRow: errors take priority over warnings", () => {
   });
   assert.equal(row.status, "error");
   assert.equal(row.message, "Нет <title>");
+});
+
+test("app.js mapApiRow: access_blocked (403 with a verification title) shows the page title as the reason (item 2)", () => {
+  const mapApiRow = extractMapApiRow("app.js");
+  const row = mapApiRow({
+    check_failed: true,
+    check_reason: "access_blocked",
+    requested_url: "https://example.ru/catalog/item",
+    status_code: 403,
+    title: "Verification required",
+    check_error: "HTTP 403. Сервер запретил HeadInspect автоматический доступ.",
+  });
+  assert.equal(row.status, "unavailable");
+  assert.equal(row.message, "Verification required");
+  // Critical: no invented Open Graph errors for a page we never trusted.
+  assert.doesNotMatch(row.issueText, /og:title|og:image|og:description/);
+});
+
+test("meta.js mapApiRow: access_blocked without a title falls back to the HTTP code", () => {
+  const mapApiRow = extractMapApiRow("meta.js");
+  const row = mapApiRow({
+    check_failed: true,
+    check_reason: "access_blocked",
+    requested_url: "https://example.ru/",
+    status_code: 429,
+    check_error: "HTTP 429. Сервер ограничил частоту автоматических запросов HeadInspect.",
+  });
+  assert.equal(row.message, "HTTP 429");
 });
 
 test("schema.js mapApiRow: reports JSON-LD counts in details", () => {
@@ -77,6 +107,7 @@ test("sitemap.js mapApiRow: a non-HTML content-type check_failed is a distinct '
   const mapApiRow = extractMapApiRow("sitemap.js");
   const row = mapApiRow({
     check_failed: true,
+    check_reason: "content_type",
     requested_url: "https://example.ru/photo.jpg",
     check_error: "Не удалось проверить страницу: Unexpected content type: image/jpeg",
   });
@@ -92,4 +123,32 @@ test("sitemap.js mapApiRow: HTTP 4xx on a sitemap URL is an 'error'", () => {
     status_code: 404,
   });
   assert.equal(row.status, "error");
+});
+
+test("sitemap.js mapApiRow: access_blocked (403) is reported as URL unavailability, not 'Без ответа' (item 3/4)", () => {
+  const mapApiRow = extractMapApiRow("sitemap.js");
+  const row = mapApiRow({
+    check_failed: true,
+    check_reason: "access_blocked",
+    url: "https://example.ru/gone",
+    requested_url: "https://example.ru/gone",
+    status_code: 403,
+  });
+  assert.equal(row.status, "error");
+  assert.equal(row.message, "HTTP 403");
+  assert.match(row.issueTitle, /URL из sitemap недоступен/);
+});
+
+test("app.js mapApiRow: different check_reason values on different pages are never mixed up (item 7: no cross-page leakage)", () => {
+  const mapApiRow = extractMapApiRow("app.js");
+  const pages = [
+    { check_failed: true, check_reason: "timeout", requested_url: "https://example.ru/slow", check_error: "Страница не ответила за 30 с" },
+    { check_failed: true, check_reason: "access_blocked", requested_url: "https://example.ru/blocked", status_code: 403, title: "Verification required" },
+    { check_failed: true, check_reason: "network", requested_url: "https://example.ru/down" },
+    { check_failed: true, check_reason: "content_type", requested_url: "https://example.ru/photo.jpg", check_error: "Unexpected content type: image/jpeg" },
+  ];
+  const messages = pages.map(mapApiRow).map(row => row.message);
+  assert.deepEqual(messages, ["Не ответила за 30 с", "Verification required", "Нет соединения", "Не HTML"]);
+  // Each message is distinct - none accidentally shares another row's text.
+  assert.equal(new Set(messages).size, messages.length);
 });

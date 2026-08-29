@@ -24,6 +24,35 @@ logger = logging.getLogger("uvicorn.error")
 
 ProgressCallback = Callable[[PageResult], Awaitable[None]]
 
+# HTTP statuses that mean "the server is refusing/throttling automated
+# access", not "here is the site's real content". A response in this set is
+# still check_failed=True (Open Graph/Meta/Schema must not draw conclusions
+# from it), but - unlike a genuine network/timeout failure - status_code IS
+# known and kept on the result, so Sitemap (which cares about URL
+# availability, not content trust) can keep treating it as a normal,
+# informative HTTP status rather than "unavailable".
+ACCESS_BLOCKED_STATUS_CODES = frozenset({401, 403, 429})
+
+# Reused verbatim from common.js's renderAccessBlocked so a blocked *page*
+# and a blocked *entry URL* explain themselves in the same voice.
+ACCESS_BLOCKED_MESSAGES = {
+    401: "Сервер требует авторизацию и не разрешил HeadInspect получить страницу.",
+    403: "Сервер запретил HeadInspect автоматический доступ. При этом страница может открываться в обычном браузере.",
+    429: "Сервер ограничил частоту автоматических запросов HeadInspect.",
+}
+
+
+def _classify_fetch_failure_reason(exc: HTTPException) -> str:
+    """Turn safe_fetch's free-text HTTPException into one of the stable
+    check_reason values, once, here - so no frontend has to pattern-match
+    check_error text to know why a page couldn't be checked (item 5)."""
+    detail = (exc.detail or "").lower()
+    if exc.status_code == 504 or "timeout" in detail:
+        return "timeout"
+    if "content type" in detail or "too large" in detail:
+        return "content_type"
+    return "network"
+
 
 async def analyze_page(
     url: str,
@@ -61,7 +90,45 @@ async def analyze_page(
                 requested_url=url,
                 status_code=None,
                 check_failed=True,
+                check_reason=_classify_fetch_failure_reason(exc),
                 check_error=f"Не удалось проверить страницу: {exc.detail}",
+            )
+
+        if result.status_code in ACCESS_BLOCKED_STATUS_CODES:
+            # A response WAS received, but it's very unlikely to be the
+            # site's real page - typically a WAF/anti-bot "verification"
+            # challenge. Deliberately do NOT run the content analyzers on
+            # it: any "Нет og:title"/"Нет meta description"/etc. we'd
+            # produce would describe the *block page*, not the real site,
+            # and would be indistinguishable from a genuine SEO problem to
+            # someone reading the results. Still worth a light parse for the
+            # page's own <title> (e.g. "Verification required") purely as a
+            # diagnostic detail for the person reading the report - this is
+            # NOT used to classify the page, only to make check_error more
+            # informative when the server happens to send one.
+            blocked_title: str | None = None
+            try:
+                parser = MetadataParser()
+                parser.feed(result.content.decode("utf-8", errors="replace"))
+                blocked_title = parser.title
+            except Exception:
+                blocked_title = None
+
+            explanation = ACCESS_BLOCKED_MESSAGES.get(
+                result.status_code, "Сервер ограничил автоматический доступ HeadInspect к этой странице."
+            )
+            check_error = f"HTTP {result.status_code}. {explanation}"
+            if blocked_title:
+                check_error += f' Заголовок страницы, которую вернул сервер: «{blocked_title}».'
+
+            return PageResult(
+                url=result.url,
+                requested_url=url,
+                status_code=result.status_code,
+                check_failed=True,
+                check_reason="access_blocked",
+                check_error=check_error,
+                title=blocked_title,
             )
 
         if result.status_code >= 400:
@@ -186,6 +253,7 @@ async def run_pages(
                 requested_url=url,
                 status_code=None,
                 check_failed=True,
+                check_reason="timeout",
                 check_error=f"Страница не ответила за {PAGE_TIMEOUT:.0f} с",
             )
 

@@ -2,7 +2,7 @@ const {
   $, $$, apiFetch, normalizeUrl, escapeHtml, escapeAttr, pluralRu, getPath,
   setAuditContext, clearAuditContext, createListProgressUi, renderAccessBlocked,
   renderJobExpired, renderPartialNotice, uniqueContentPages, sortRowsForDisplay,
-  pollJobUntilDone, describeError, isJobNotFound
+  pollJobUntilDone, describeError, isJobNotFound, describeCheckReason
 } = HI;
 
 const form = $("#audit-form");
@@ -52,10 +52,14 @@ function mapApiRow(page) {
       status: "unavailable",
       path: getPath(page.requested_url || page.url),
       pageUrl: page.url || page.requested_url,
-      message: "Не удалось проверить",
+      // Short, reason-specific label shown right on the collapsed row in
+      // the "Без ответа" list - a timeout, an access-blocked page, and a
+      // network failure all look different at a glance, not just after
+      // clicking into each one (items 2/3 of the check_reason work).
+      message: describeCheckReason(page),
       issueTitle: "Страница не проверена",
-      issueText: page.check_error?.startsWith("Страница не ответила за")
-        ? "Страница не ответила за 30 с. Возможно, сервер отвечает слишком медленно или ограничивает частые автоматические запросы."
+      issueText: page.check_reason === "timeout"
+        ? `${page.check_error || "Страница не ответила вовремя"}. Возможно, сервер отвечает слишком медленно или ограничивает частые автоматические запросы.`
         : (page.check_error || "HeadInspect не смог получить страницу."),
       details: {}
     };

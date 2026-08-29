@@ -394,6 +394,39 @@
     return status === "completed" || status === "completed_partial";
   }
 
+  // --- "Без ответа" reason label (items 2, 3, 5) ---------------------------
+  // A short, human-readable label for a check_failed page, driven by the
+  // backend's structured `check_reason` rather than pattern-matching
+  // `check_error` text. Shown right on the collapsed row in the "Без
+  // ответа" list (not only after clicking into the detail) - the whole
+  // point is that a user browsing that list can tell a timeout apart from
+  // an access-blocked page apart from a network failure without opening
+  // each row individually. The full explanatory sentence (check_error)
+  // still appears in the detail panel underneath.
+  function describeCheckReason(page) {
+    if (page.check_reason === "timeout") {
+      // Backend's check_error reads e.g. "Страница не ответила за 30 с" -
+      // pull just the duration out of that stable, backend-controlled
+      // phrase rather than hard-coding PAGE_TIMEOUT's value here too.
+      const match = /не ответила за ([^.]+)/i.exec(page.check_error || "");
+      return match ? `Не ответила за ${match[1]}` : "Таймаут";
+    }
+    if (page.check_reason === "access_blocked") {
+      // Prefer the page's own title when the server sent one (e.g.
+      // "Verification required") - it's the most concrete, specific label
+      // available. Falling back to the HTTP code keeps this useful even
+      // when there is no title.
+      return page.title || `HTTP ${page.status_code ?? "?"}`;
+    }
+    if (page.check_reason === "content_type") {
+      return "Не HTML";
+    }
+    if (page.check_reason === "network") {
+      return "Нет соединения";
+    }
+    return "Не удалось проверить";
+  }
+
   // --- Content-module de-duplication ---------------------------------------
   // Open Graph / Meta / Schema show each *final* page once, preferring the
   // page reached directly over one reached only via a redirect. check_failed
@@ -485,6 +518,7 @@
     renderJobExpired,
     renderPartialNotice,
     isCompletedStatus,
+    describeCheckReason,
     uniqueContentPages,
     sortRowsForDisplay,
     pollJobUntilDone

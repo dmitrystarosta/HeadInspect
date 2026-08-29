@@ -269,3 +269,40 @@ test("renderPartialNotice replaces (not accumulates) the banner across two compl
   assert.match(resultsCard.children[0].innerHTML, /Причина job B/);
   assert.doesNotMatch(resultsCard.children[0].innerHTML, /Причина job A/);
 });
+
+test("describeCheckReason: timeout extracts the duration from check_error, not a hard-coded number", () => {
+  const { HI } = setup();
+  assert.equal(
+    HI.describeCheckReason({ check_reason: "timeout", check_error: "Страница не ответила за 30 с" }),
+    "Не ответила за 30 с"
+  );
+  // Robust to a different configured PAGE_TIMEOUT value, not just "30".
+  assert.equal(
+    HI.describeCheckReason({ check_reason: "timeout", check_error: "Страница не ответила за 45 с" }),
+    "Не ответила за 45 с"
+  );
+});
+
+test("describeCheckReason: access_blocked prefers the page's own title, falls back to the HTTP code", () => {
+  const { HI } = setup();
+  assert.equal(
+    HI.describeCheckReason({ check_reason: "access_blocked", title: "Verification required", status_code: 403 }),
+    "Verification required"
+  );
+  assert.equal(
+    HI.describeCheckReason({ check_reason: "access_blocked", title: null, status_code: 429 }),
+    "HTTP 429"
+  );
+});
+
+test("describeCheckReason: network and content_type get distinct, short labels", () => {
+  const { HI } = setup();
+  assert.equal(HI.describeCheckReason({ check_reason: "network" }), "Нет соединения");
+  assert.equal(HI.describeCheckReason({ check_reason: "content_type" }), "Не HTML");
+});
+
+test("describeCheckReason: unknown/missing reason falls back to the generic label (regression safety)", () => {
+  const { HI } = setup();
+  assert.equal(HI.describeCheckReason({}), "Не удалось проверить");
+  assert.equal(HI.describeCheckReason({ check_reason: "something_new_and_unhandled" }), "Не удалось проверить");
+});

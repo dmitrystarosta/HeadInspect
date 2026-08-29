@@ -11,10 +11,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SITE_DIR = path.join(__dirname, "..", "..", "site");
 
 function matchesSimpleSelector(el, selector) {
-  // Only what this test suite actually needs: a single ".classname".
-  const m = /^\.([\w-]+)$/.exec(selector.trim());
-  if (!m) return false;
-  return el.classList && el.classList.contains(m[1]);
+  // Supports what this test suite needs: a single ".classname", or a
+  // two-token descendant combinator ".classname tagname" (e.g.
+  // ".audit-module-body p") - not a general CSS engine.
+  const classOnly = /^\.([\w-]+)$/.exec(selector.trim());
+  if (classOnly) {
+    return !!(el.classList && el.classList.contains(classOnly[1]));
+  }
+  const descendant = /^\.([\w-]+)\s+(\w+)$/.exec(selector.trim());
+  if (descendant) {
+    const [, ancestorClass, tag] = descendant;
+    if ((el.tagName || "").toLowerCase() !== tag.toLowerCase()) return false;
+    let node = el._parent;
+    while (node) {
+      if (node.classList && node.classList.contains(ancestorClass)) return true;
+      node = node._parent;
+    }
+    return false;
+  }
+  return false;
 }
 
 function queryAllDescendants(root, selector, results) {
@@ -87,12 +102,17 @@ export function makeEl(tag) {
 // to pre-built elements, so a full page's worth of DOM lookups succeeds
 // without needing a real browser or jsdom. Any selector not in the registry
 // still safely resolves to null/[] like the stub in buildSandbox.
-export function buildRegistryDocument(idRegistry) {
+export function buildRegistryDocument(idRegistry, moduleRegistry = {}) {
   const byId = new Map(Object.entries(idRegistry));
+  const byModule = new Map(Object.entries(moduleRegistry));
   return {
     querySelector(sel) {
-      const match = /^#([\w-]+)$/.exec(sel);
-      if (match && byId.has(match[1])) return byId.get(match[1]);
+      const idMatch = /^#([\w-]+)$/.exec(sel);
+      if (idMatch && byId.has(idMatch[1])) return byId.get(idMatch[1]);
+      // Supports home.js's `.audit-module[data-module="open-graph"]` lookup
+      // specifically - the only compound selector this test suite needs.
+      const moduleMatch = /^\.audit-module\[data-module="([\w-]+)"\]$/.exec(sel);
+      if (moduleMatch && byModule.has(moduleMatch[1])) return byModule.get(moduleMatch[1]);
       return null;
     },
     querySelectorAll() { return []; },

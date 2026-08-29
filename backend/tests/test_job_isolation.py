@@ -43,7 +43,13 @@ async def test_sequential_jobs_do_not_share_any_state(monkeypatch):
         for i, u in enumerate(urls[:30]):
             await on_result(PageResult(url=u, requested_url=u, status_code=200))
         for i, u in enumerate(urls[30:42]):
-            await on_result(PageResult(url=u, requested_url=u, status_code=403, errors=["HTTP 403"]))
+            # Mirrors the real analyze_page (app/audit.py): a 401/403/429
+            # response is check_failed=True/check_reason="access_blocked",
+            # not a content-analysis error - see PROPOSAL_2026-08-29.
+            await on_result(PageResult(
+                url=u, requested_url=u, status_code=403,
+                check_failed=True, check_reason="access_blocked",
+            ))
 
     monkeypatch.setattr(jobs_module, "discover_audit_urls", discover_a)
     monkeypatch.setattr(jobs_module, "run_pages", run_pages_a)
@@ -169,3 +175,78 @@ async def test_job_manager_jobs_dict_keeps_jobs_fully_separate():
 
     manager.get("a").checked_urls = 999
     assert manager.get("b").checked_urls == 9
+
+
+async def test_check_reason_does_not_leak_between_sequential_jobs(monkeypatch):
+    """Item 7 of the updated task: job A mixes access_blocked (zipkran.ru-
+    shaped) and timeout (radov39.ru-shaped) pages; job B is a clean run
+    straight afterwards. Job B's results must carry none of job A's
+    check_reason values, and job A's stored results must be untouched by
+    running job B.
+    """
+    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 30)
+    manager = JobManager()
+
+    urls_a = [f"https://zipkran.ru/p{i}" for i in range(10)]
+
+    async def discover_a(url):
+        return {
+            "normalized_url": "https://zipkran.ru/", "robots_url": None, "robots_found": None,
+            "robots_sitemap_urls": [], "sitemap_urls": [], "sitemap_issues": [],
+            "urls": urls_a, "limited": False, "access_blocked_status": None,
+        }
+
+    async def run_pages_a(urls, on_result, *, stop_event=None):
+        for i, u in enumerate(urls):
+            if i < 5:
+                await on_result(PageResult(url=u, requested_url=u, status_code=200))
+            elif i < 8:
+                await on_result(PageResult(
+                    url=u, requested_url=u, status_code=403,
+                    check_failed=True, check_reason="access_blocked",
+                ))
+            else:
+                await on_result(PageResult(
+                    url=u, requested_url=u, status_code=None,
+                    check_failed=True, check_reason="timeout",
+                ))
+
+    monkeypatch.setattr(jobs_module, "discover_audit_urls", discover_a)
+    monkeypatch.setattr(jobs_module, "run_pages", run_pages_a)
+
+    job_a = Job(job_id="job-a-mixed-reasons", requested_url="https://zipkran.ru/")
+    manager.jobs[job_a.job_id] = job_a
+    await manager._run(job_a)
+
+    reasons_in_a = {r.check_reason for r in job_a.results}
+    assert reasons_in_a == {None, "access_blocked", "timeout"}
+    job_a_results_snapshot = [(r.url, r.check_reason) for r in job_a.results]
+
+    # --- Job B: clean run, no failures of any kind. -------------------------
+    urls_b = [f"https://bionicashow.ru/p{i}" for i in range(6)]
+
+    async def discover_b(url):
+        return {
+            "normalized_url": "https://bionicashow.ru/", "robots_url": None, "robots_found": None,
+            "robots_sitemap_urls": [], "sitemap_urls": [], "sitemap_issues": [],
+            "urls": urls_b, "limited": False, "access_blocked_status": None,
+        }
+
+    async def run_pages_b(urls, on_result, *, stop_event=None):
+        for u in urls:
+            await on_result(PageResult(url=u, requested_url=u, status_code=200))
+
+    monkeypatch.setattr(jobs_module, "discover_audit_urls", discover_b)
+    monkeypatch.setattr(jobs_module, "run_pages", run_pages_b)
+
+    job_b = Job(job_id="job-b-clean", requested_url="https://bionicashow.ru/")
+    manager.jobs[job_b.job_id] = job_b
+    await manager._run(job_b)
+
+    # Job B has none of job A's reasons.
+    reasons_in_b = {r.check_reason for r in job_b.results}
+    assert reasons_in_b == {None}
+    assert job_b.failed_checks == 0
+
+    # Job A's stored results are byte-for-byte the same after job B ran.
+    assert [(r.url, r.check_reason) for r in job_a.results] == job_a_results_snapshot

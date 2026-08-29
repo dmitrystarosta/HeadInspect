@@ -59,12 +59,29 @@ class SchemaData(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+CheckFailureReason = Literal["network", "timeout", "content_type", "access_blocked"]
+
+
 class PageResult(BaseModel):
     url: str
     requested_url: str | None = None
     status_code: int | None = None
     check_failed: bool = False
     check_error: str | None = None
+    # Structured reason a check_failed page could not be reliably checked -
+    # lets the frontend branch on a stable value instead of pattern-matching
+    # check_error's free text (which is still shown to the user as-is, but
+    # is no longer the only way to know *why*):
+    #   "network"        - DNS/connection failure, no HTTP response at all
+    #   "timeout"         - no HTTP response within the time budget
+    #   "content_type"    - a response was received but wasn't analyzable
+    #                       HTML (wrong content type, or too large)
+    #   "access_blocked"  - a response WAS received (status_code is set),
+    #                       but it was 401/403/429 - likely a WAF/verification
+    #                       page rather than the site's real content, so
+    #                       Open Graph/Meta/Schema analysis was skipped
+    # None when check_failed is False.
+    check_reason: CheckFailureReason | None = None
     title: str | None = None
     meta_description: str | None = None
     open_graph: OpenGraphData = Field(default_factory=OpenGraphData)

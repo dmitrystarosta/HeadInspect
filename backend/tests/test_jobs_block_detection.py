@@ -2,20 +2,38 @@ from __future__ import annotations
 
 import asyncio
 
+from app.audit import ACCESS_BLOCKED_STATUS_CODES
 from app.jobs import Job, JobManager
 from app.models import PageResult
 
 
 def make_result(url, status_code=200, check_failed=False):
+    # Mirror what the real analyze_page (app/audit.py) now produces: a
+    # response with status_code in {401, 403, 429} is check_failed=True with
+    # check_reason="access_blocked" and NO content-analysis errors - Open
+    # Graph/Meta/Schema errors are never invented for a page HeadInspect
+    # chose not to trust as real content (see PROPOSAL_2026-08-29 and the
+    # "check_reason" work). This replaced the old fixture shape where a 403
+    # page carried errors=["HTTP 403"] and check_failed=False - keeping this
+    # helper in sync with the real function is exactly what the previous
+    # incident (test fixtures silently drifting from production code)
+    # taught us to be careful about.
+    access_blocked = not check_failed and status_code in ACCESS_BLOCKED_STATUS_CODES
+    if access_blocked:
+        check_failed = True
+
     errors, warnings = [], []
     if not check_failed and status_code is not None:
         if status_code >= 400:
             errors.append(f"HTTP {status_code}")
         elif status_code >= 300:
             warnings.append(f"HTTP {status_code}")
+
+    check_reason = "access_blocked" if access_blocked else (None if not check_failed else "timeout")
+
     return PageResult(
         url=url, requested_url=url, status_code=status_code,
-        check_failed=check_failed, errors=errors, warnings=warnings,
+        check_failed=check_failed, check_reason=check_reason, errors=errors, warnings=warnings,
     )
 
 
@@ -38,7 +56,12 @@ async def test_single_403_among_healthy_pages_is_not_a_block():
     assert job.blocked_mid_audit is False
     assert not stop_event.is_set()
     assert job.checked_urls == 41
-    assert job.errors_found == 1
+    # A single 403 is check_failed=True/check_reason="access_blocked" now
+    # (see make_result above) - it is a page HeadInspect could not verify,
+    # not a proven Open Graph/Meta/Schema error, so it belongs in
+    # failed_checks, not errors_found.
+    assert job.errors_found == 0
+    assert job.failed_checks == 1
 
 
 async def test_mass_403_after_good_pages_is_detected_as_a_block():

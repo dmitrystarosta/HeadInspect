@@ -10,7 +10,7 @@ import uuid
 
 from fastapi import HTTPException
 
-from .audit import discover_audit_urls, run_pages
+from .audit import ACCESS_BLOCKED_STATUS_CODES, discover_audit_urls, run_pages
 from .config import (
     AUDIT_TIMEOUT,
     JOB_TTL_SECONDS,
@@ -56,7 +56,9 @@ def _format_wait(seconds: int) -> str:
 BLOCK_DETECT_WINDOW = 12
 BLOCK_DETECT_MIN_GOOD_BEFORE = 5
 BLOCK_DETECT_RATIO = 0.9
-BLOCK_DETECT_STATUS_CODES = frozenset({401, 403, 429})
+# Reuse audit.py's set rather than maintaining a second copy of the same
+# three status codes - they must never silently drift apart.
+BLOCK_DETECT_STATUS_CODES = ACCESS_BLOCKED_STATUS_CODES
 
 
 @dataclass
@@ -166,9 +168,17 @@ class JobManager:
 
         async def on_result(result: PageResult) -> None:
             async with job.lock:
-                is_block_response = (
-                    not result.check_failed and result.status_code in BLOCK_DETECT_STATUS_CODES
-                )
+                # NOTE: this must key off status_code alone, never
+                # result.check_failed. Since access_blocked pages (see
+                # audit.py::analyze_page) are now ALSO check_failed=True,
+                # `not result.check_failed` would silently exclude every
+                # single 401/403/429 response from this detector - the exact
+                # mass-block signal it exists to catch. status_code is still
+                # populated for access_blocked pages (only genuine
+                # network/timeout failures leave it as None, and `None in
+                # BLOCK_DETECT_STATUS_CODES` is already False), so this is a
+                # pure simplification, not a behavior change for those cases.
+                is_block_response = result.status_code in BLOCK_DETECT_STATUS_CODES
 
                 if not state["block_triggered"]:
                     recent_outcomes.append(is_block_response)

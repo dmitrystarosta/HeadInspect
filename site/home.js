@@ -120,11 +120,16 @@ function renderAuditModule(moduleName, pages, status, jobId) {
   dot?.classList.add(errors ? "error" : warnings ? "warning" : "success");
 
   if (counts) {
-    if (errors || warnings) {
-      counts.innerHTML = `<strong>${errors} ${pluralRu(errors, "ошибка", "ошибки", "ошибок")}</strong><small>${warnings} ${pluralRu(warnings, "предупреждение", "предупреждения", "предупреждений")}</small>`;
-    } else {
-      counts.innerHTML = `<strong class="module-ok">Ошибок нет</strong><small>Предупреждений нет</small>`;
-    }
+    // Independent per-metric text (item 1): "0 ошибок"/"0 предупреждений"
+    // must never appear as literal text - each metric gets its own
+    // "нет"/numeric decision, using the existing green "module-ok" style
+    // (already bold via the <strong> tag itself - the same visual style
+    // already used for the fully-clean case) rather than a combined
+    // errors-or-warnings condition, which is what let "0 ошибок" slip
+    // through whenever warnings alone were non-zero.
+    const errorsText = errors ? `${errors} ${pluralRu(errors, "ошибка", "ошибки", "ошибок")}` : "Нет ошибок";
+    const warningsText = warnings ? `${warnings} ${pluralRu(warnings, "предупреждение", "предупреждения", "предупреждений")}` : "Нет предупреждений";
+    counts.innerHTML = `<strong${errors ? "" : ' class="module-ok"'}>${errorsText}</strong><small>${warningsText}</small>`;
   }
 
   const failedChecks = pages.filter(page => page.check_failed).length;
@@ -139,9 +144,9 @@ function renderAuditModule(moduleName, pages, status, jobId) {
 
   if (bodyText) {
     const unavailableText = failedChecks ? ` Не удалось проверить: ${failedChecks}. Эти страницы не считаются ошибками сайта.` : "";
-    bodyText.textContent = errors || warnings
-      ? `${checkedText} Найдено ошибок: ${errors}, предупреждений: ${warnings}.${unavailableText}`
-      : `${checkedText} Ошибок и предупреждений не найдено.${unavailableText}`;
+    const errorsSummary = errors ? `ошибок: ${errors}` : "ошибок нет";
+    const warningsSummary = warnings ? `предупреждений: ${warnings}` : "предупреждений нет";
+    bodyText.textContent = `${checkedText} Найдено — ${errorsSummary}, ${warningsSummary}.${unavailableText}`;
   }
 
   if (link && status.normalized_url) {

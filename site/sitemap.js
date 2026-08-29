@@ -2,7 +2,7 @@ const {
   $, $$, apiFetch, normalizeUrl, escapeHtml, escapeAttr, getPath,
   setAuditContext, clearAuditContext, createListProgressUi, renderAccessBlocked,
   renderJobExpired, renderPartialNotice, sortRowsForDisplay,
-  pollJobUntilDone, describeError, isJobNotFound
+  pollJobUntilDone, describeError, isJobNotFound, describeCheckReason
 } = HI;
 
 const form = $("#audit-form");
@@ -37,14 +37,18 @@ function setSubmitting(isSubmitting) {
 }
 
 function mapApiRow(page) {
-  if (page.check_failed) {
-    const checkError = page.check_error || "";
-    const contentTypeMatch = checkError.match(/Unexpected content type:\s*([^\s]+)/i);
-
-    // URL ответил, но вернул не HTML (например, image/jpeg). Для Sitemap это
-    // не «Без ответа»: показываем отдельную понятную ошибку самого URL в карте сайта.
-    if (contentTypeMatch) {
-      const contentType = contentTypeMatch[1];
+  // access_blocked pages (401/403/429) deliberately fall through to the
+  // status_code-driven logic below, NOT the generic "check_failed" branch:
+  // Sitemap's job is to report URL availability, and status_code IS known
+  // and correct for these (unlike a genuine network/timeout failure, where
+  // it's null) - "URL из sitemap недоступен: HTTP 403" is exactly right
+  // here, "Без ответа" would understate what Sitemap actually found out.
+  if (page.check_failed && page.check_reason !== "access_blocked") {
+    if (page.check_reason === "content_type") {
+      // URL ответил, но вернул не HTML (например, image/jpeg). Для Sitemap это
+      // не «Без ответа»: показываем отдельную понятную ошибку самого URL в карте сайта.
+      const contentTypeMatch = /Unexpected content type:\s*([^\s]+)/i.exec(page.check_error || "");
+      const contentType = contentTypeMatch ? contentTypeMatch[1] : "не HTML";
       return {
         status: "error",
         path: getPath(page.requested_url || page.url),
@@ -60,11 +64,11 @@ function mapApiRow(page) {
       status: "unavailable",
       path: getPath(page.requested_url || page.url),
       pageUrl: page.url || page.requested_url,
-      message: "Не удалось проверить",
+      message: describeCheckReason(page),
       issueTitle: "Страница не проверена",
-      issueText: checkError.startsWith("Страница не ответила за")
-        ? "Страница не ответила за 30 с. Возможно, сервер отвечает слишком медленно или ограничивает частые автоматические запросы."
-        : (checkError || "HeadInspect не смог получить страницу."),
+      issueText: page.check_reason === "timeout"
+        ? `${page.check_error || "Страница не ответила вовремя"}. Возможно, сервер отвечает слишком медленно или ограничивает частые автоматические запросы.`
+        : (page.check_error || "HeadInspect не смог получить страницу."),
       details: { originalUrl: page.requested_url || page.url, finalUrl: page.url || page.requested_url, statusCode: "—", redirected: false }
     };
   }
