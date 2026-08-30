@@ -11,3 +11,6 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local Python virtual environment
+backend/.venv/

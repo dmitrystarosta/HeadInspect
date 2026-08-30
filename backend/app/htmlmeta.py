@@ -120,3 +120,67 @@ class MetadataParser(HTMLParser):
 
     def meta_values(self, name: str) -> list[str]:
         return list(self.meta_by_name.get(name.lower(), []))
+
+
+def _charset_from_header(content_type_header: str | None) -> str | None:
+    if not content_type_header:
+        return None
+    match = _CHARSET_RE.search(content_type_header)
+    if not match:
+        return None
+    charset = match.group(1).strip("\"'")
+    return charset or None
+
+
+def sniff_charset(content: bytes, content_type_header: str | None = None) -> str:
+    """Charset detection in the standard (browser-like) priority order -
+    deliberately not a statistical/heuristic auto-detector, just the
+    explicit signals a well-behaved response provides:
+
+      1. charset from the HTTP Content-Type response header - the most
+         authoritative source, since it's a signal from the server
+         operator, not from document content a page author might get wrong;
+      2. <meta charset="..."> declared in the document itself;
+      3. the older <meta http-equiv="Content-Type" content="text/html;
+         charset=..."> form;
+      4. UTF-8, if nothing was declared anywhere.
+
+    If the HTTP header and an in-document <meta> disagree, the HTTP header
+    wins outright - this matches real browser behavior (the transport-level
+    signal is treated as more authoritative than document-internal markup)
+    and is checked first, so a conflicting <meta> is never even consulted.
+    """
+    header_charset = _charset_from_header(content_type_header)
+    if header_charset:
+        return header_charset
+
+    # We don't know the real encoding yet, so this can't decode the bytes
+    # "properly" - only far enough to spot an ASCII meta tag. latin-1 maps
+    # every byte to exactly one code point and can never raise, so this is
+    # a safe, lossless way to read only the ASCII structure of the prefix
+    # without needing to already know the encoding. Per the HTML5 spec a
+    # charset meta tag must appear within the first 1024 bytes; 4096 is a
+    # generous allowance for real-world pages that don't strictly comply.
+    prober = MetadataParser()
+    try:
+        prober.feed(content[:4096].decode("latin-1"))
+    except Exception:
+        pass
+    if prober.charset:
+        return prober.charset
+
+    return "utf-8"
+
+
+def decode_html(content: bytes, content_type_header: str | None = None) -> str:
+    """Decode HTML bytes using the detected charset (see sniff_charset).
+    Always succeeds: an unknown codec name or a charset declaration that
+    doesn't actually match the bytes (a lying/broken page) falls back to
+    UTF-8 with replacement characters, exactly like the previous
+    unconditional-UTF-8 behavior - a bad declaration must degrade
+    gracefully, never raise or crash the audit."""
+    charset = sniff_charset(content, content_type_header)
+    try:
+        return content.decode(charset)
+    except (LookupError, UnicodeDecodeError):
+        return content.decode("utf-8", errors="replace")

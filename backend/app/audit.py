@@ -12,7 +12,7 @@ from .analyzers.open_graph import analyze_open_graph
 from .analyzers.schema import analyze_schema
 from .config import MAX_HTML_BYTES, PAGE_CONCURRENCY, PAGE_TIMEOUT
 from .fetcher import safe_fetch
-from .htmlmeta import MetadataParser
+from .htmlmeta import MetadataParser, decode_html
 from .models import PageResult
 from .robots import fetch_robots, sitemap_urls_from_robots
 from .security import validate_public_url
@@ -60,107 +60,144 @@ async def analyze_page(
     *,
     stop_event: asyncio.Event | None = None,
 ) -> PageResult | None:
+    if stop_event is not None and stop_event.is_set():
+        # Cheap early exit for workers whose turn comes after mid-audit
+        # block detection already fired - avoids even queuing on the
+        # semaphore for a site we've already decided to stop hammering.
+        return None
+
     async with semaphore:
         # Re-check *after* acquiring the semaphore, not only before. With a
-        # large URL list, every worker's pre-semaphore stop_event check (see
-        # run_pages.worker) can run before a single real fetch has
-        # completed - detection only fires after dozens of genuine
-        # responses come back, which takes real wall-clock time. Without
-        # this second check, hundreds of workers that already passed the
-        # first check end up merely queued on the semaphore, and each one
-        # still makes a real request once its turn comes, long after the
-        # site was already confirmed to be blocking HeadInspect. Returning
-        # None here means "never attempted" - the caller must not count it
-        # anywhere (not checked_urls, not failed_checks, not results).
+        # large URL list, every worker's pre-semaphore stop_event check can
+        # run before a single real fetch has completed - detection only
+        # fires after dozens of genuine responses come back, which takes
+        # real wall-clock time. Without this second check, hundreds of
+        # workers that already passed the first check end up merely queued
+        # on the semaphore, and each one still makes a real request once its
+        # turn comes, long after the site was already confirmed to be
+        # blocking HeadInspect. Returning None here means "never attempted"
+        # - the caller must not count it anywhere (not checked_urls, not
+        # failed_checks, not results).
         if stop_event is not None and stop_event.is_set():
             return None
 
-        errors: list[str] = []
-        warnings: list[str] = []
-
+        # PAGE_TIMEOUT is deliberately applied *here* - after the semaphore
+        # has actually been acquired - and not around this whole function.
+        # Wrapping the semaphore wait in the same timeout used to mean a URL
+        # could be reported as "did not respond in 30s" purely because it
+        # spent all 30 of those seconds queued behind PAGE_CONCURRENCY,
+        # never once touching the network. With up to MAX_AUDIT_URLS (500)
+        # workers all created by asyncio.gather at nearly the same instant,
+        # every one of them would start its own 30-second countdown at
+        # essentially the same wall-clock moment - the deadline had nothing
+        # to do with how long *this page's own* check actually took. Timing
+        # only the real fetch-and-analyze work below means "не ответила за
+        # 30 с" now means exactly that: this page's own check ran for 30
+        # seconds after it started and did not finish.
         try:
-            result = await safe_fetch(
-                url,
-                max_bytes=MAX_HTML_BYTES,
-                accepted_content_types=("text/html", "application/xhtml+xml"),
-            )
-        except HTTPException as exc:
+            return await asyncio.wait_for(_fetch_and_analyze(url), timeout=PAGE_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.warning("Page audit timed out after %.0fs: %s", PAGE_TIMEOUT, url)
             return PageResult(
                 url=url,
                 requested_url=url,
                 status_code=None,
                 check_failed=True,
-                check_reason=_classify_fetch_failure_reason(exc),
-                check_error=f"Не удалось проверить страницу: {exc.detail}",
+                check_reason="timeout",
+                check_error=f"Страница не ответила за {PAGE_TIMEOUT:.0f} с",
             )
 
-        if result.status_code in ACCESS_BLOCKED_STATUS_CODES:
-            # A response WAS received, but it's very unlikely to be the
-            # site's real page - typically a WAF/anti-bot "verification"
-            # challenge. Deliberately do NOT run the content analyzers on
-            # it: any "Нет og:title"/"Нет meta description"/etc. we'd
-            # produce would describe the *block page*, not the real site,
-            # and would be indistinguishable from a genuine SEO problem to
-            # someone reading the results. Still worth a light parse for the
-            # page's own <title> (e.g. "Verification required") purely as a
-            # diagnostic detail for the person reading the report - this is
-            # NOT used to classify the page, only to make check_error more
-            # informative when the server happens to send one.
-            blocked_title: str | None = None
-            try:
-                parser = MetadataParser()
-                parser.feed(result.content.decode("utf-8", errors="replace"))
-                blocked_title = parser.title
-            except Exception:
-                blocked_title = None
 
-            explanation = ACCESS_BLOCKED_MESSAGES.get(
-                result.status_code, "Сервер ограничил автоматический доступ HeadInspect к этой странице."
-            )
-            check_error = f"HTTP {result.status_code}. {explanation}"
-            if blocked_title:
-                check_error += f' Заголовок страницы, которую вернул сервер: «{blocked_title}».'
+async def _fetch_and_analyze(url: str) -> PageResult:
+    """The actual per-page work: fetch, decide access_blocked/ordinary, run
+    the content analyzers. Split out from analyze_page so PAGE_TIMEOUT can
+    wrap *only* this - not the semaphore wait that precedes it."""
+    errors: list[str] = []
+    warnings: list[str] = []
 
-            return PageResult(
-                url=result.url,
-                requested_url=url,
-                status_code=result.status_code,
-                check_failed=True,
-                check_reason="access_blocked",
-                check_error=check_error,
-                title=blocked_title,
-            )
+    try:
+        result = await safe_fetch(
+            url,
+            max_bytes=MAX_HTML_BYTES,
+            accepted_content_types=("text/html", "application/xhtml+xml"),
+        )
+    except HTTPException as exc:
+        return PageResult(
+            url=url,
+            requested_url=url,
+            status_code=None,
+            check_failed=True,
+            check_reason=_classify_fetch_failure_reason(exc),
+            check_error=f"Не удалось проверить страницу: {exc.detail}",
+        )
 
-        if result.status_code >= 400:
-            errors.append(f"HTTP {result.status_code}")
-        elif result.status_code >= 300:
-            warnings.append(f"HTTP {result.status_code}")
-
-        parser = MetadataParser()
+    if result.status_code in ACCESS_BLOCKED_STATUS_CODES:
+        # A response WAS received, but it's very unlikely to be the
+        # site's real page - typically a WAF/anti-bot "verification"
+        # challenge. Deliberately do NOT run the content analyzers on
+        # it: any "Нет og:title"/"Нет meta description"/etc. we'd
+        # produce would describe the *block page*, not the real site,
+        # and would be indistinguishable from a genuine SEO problem to
+        # someone reading the results. Still worth a light parse for the
+        # page's own <title> (e.g. "Verification required") purely as a
+        # diagnostic detail for the person reading the report - this is
+        # NOT used to classify the page, only to make check_error more
+        # informative when the server happens to send one.
+        blocked_title: str | None = None
         try:
-            parser.feed(result.content.decode("utf-8", errors="replace"))
+            parser = MetadataParser()
+            parser.feed(decode_html(result.content, result.headers.get("content-type")))
+            blocked_title = parser.title
         except Exception:
-            errors.append("Не удалось разобрать HTML")
+            blocked_title = None
 
-        og_data, og_errors, og_warnings = await analyze_open_graph(parser.og, result.url)
-        errors.extend(og_errors)
-        warnings.extend(og_warnings)
-
-        meta_data = analyze_meta(parser)
-        schema_data = analyze_schema(parser.json_ld_blocks, parser.microdata_types)
+        explanation = ACCESS_BLOCKED_MESSAGES.get(
+            result.status_code, "Сервер ограничил автоматический доступ HeadInspect к этой странице."
+        )
+        check_error = f"HTTP {result.status_code}. {explanation}"
+        if blocked_title:
+            check_error += f' Заголовок страницы, которую вернул сервер: «{blocked_title}».'
 
         return PageResult(
             url=result.url,
             requested_url=url,
             status_code=result.status_code,
-            title=parser.title,
-            meta_description=parser.meta_description,
-            open_graph=og_data,
-            meta=meta_data,
-            schema_data=schema_data,
-            errors=errors,
-            warnings=warnings,
+            check_failed=True,
+            check_reason="access_blocked",
+            check_error=check_error,
+            title=blocked_title,
         )
+
+    if result.status_code >= 400:
+        errors.append(f"HTTP {result.status_code}")
+    elif result.status_code >= 300:
+        warnings.append(f"HTTP {result.status_code}")
+
+    parser = MetadataParser()
+    try:
+        parser.feed(decode_html(result.content, result.headers.get("content-type")))
+    except Exception:
+        errors.append("Не удалось разобрать HTML")
+
+    og_data, og_errors, og_warnings = await analyze_open_graph(parser.og, result.url)
+    errors.extend(og_errors)
+    warnings.extend(og_warnings)
+
+    meta_data = analyze_meta(parser)
+    schema_data = analyze_schema(parser.json_ld_blocks, parser.microdata_types)
+
+    return PageResult(
+        url=result.url,
+        requested_url=url,
+        status_code=result.status_code,
+        title=parser.title,
+        meta_description=parser.meta_description,
+        open_graph=og_data,
+        meta=meta_data,
+        schema_data=schema_data,
+        errors=errors,
+        warnings=warnings,
+    )
 
 
 async def discover_audit_urls(raw_url: str) -> dict:
@@ -236,33 +273,14 @@ async def run_pages(
     semaphore = asyncio.Semaphore(PAGE_CONCURRENCY)
 
     async def worker(url: str) -> None:
-        if stop_event is not None and stop_event.is_set():
-            # Cheap early exit for workers whose turn comes after detection
-            # already fired - avoids even queuing on the semaphore.
-            return
-
-        try:
-            result = await asyncio.wait_for(
-                analyze_page(url, semaphore, stop_event=stop_event),
-                timeout=PAGE_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
-            logger.warning("Page audit timed out after %.0fs: %s", PAGE_TIMEOUT, url)
-            result = PageResult(
-                url=url,
-                requested_url=url,
-                status_code=None,
-                check_failed=True,
-                check_reason="timeout",
-                check_error=f"Страница не ответила за {PAGE_TIMEOUT:.0f} с",
-            )
-
+        # analyze_page now owns the stop_event checks (before and after
+        # acquiring the semaphore) and the PAGE_TIMEOUT wrapping (applied
+        # only to the real fetch-and-analyze work, not to queueing) - see
+        # its docstring/comments. worker() is intentionally just dispatch:
+        # None means "never attempted, don't count it anywhere".
+        result = await analyze_page(url, semaphore, stop_event=stop_event)
         if result is None:
-            # analyze_page declined to run at all (stop_event fired while
-            # this worker was queued behind PAGE_CONCURRENCY) - genuinely
-            # never attempted, must not be counted anywhere.
             return
-
         await on_result(result)
 
     await asyncio.gather(*(worker(url) for url in urls))

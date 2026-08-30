@@ -122,13 +122,16 @@ async def test_fetch_failure_reason_classification(monkeypatch, exc, expected_re
 
 
 async def test_page_timeout_wrapper_sets_timeout_reason(monkeypatch):
-    """The *outer* PAGE_TIMEOUT wrapper in run_pages.worker (not fetcher.py's
-    own inner timeout) is what actually fires in production for a genuinely
-    slow site (radov39.ru) - must also carry check_reason='timeout'."""
-    async def hang_forever(url, semaphore, *, stop_event=None):
+    """Item 7.2: a URL that DID acquire its semaphore slot (real processing
+    started) but whose fetch-and-analyze work doesn't finish within
+    PAGE_TIMEOUT must be reported as check_reason='timeout'. Mocks
+    _fetch_and_analyze (the inner work function PAGE_TIMEOUT now wraps),
+    not analyze_page itself - analyze_page is real here, exercising its own
+    wait_for/semaphore logic end to end."""
+    async def hang_forever(url):
         await asyncio.sleep(10)
 
-    monkeypatch.setattr(audit_module, "analyze_page", hang_forever)
+    monkeypatch.setattr(audit_module, "_fetch_and_analyze", hang_forever)
     monkeypatch.setattr(audit_module, "PAGE_TIMEOUT", 0.05)
 
     seen = []
