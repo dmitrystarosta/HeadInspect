@@ -1351,6 +1351,20 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
   .status-unavailable .status-dot { background: #718096 !important; }
   .status-unavailable .result-message { color: var(--muted) !important; }
 
+  /* Dark-theme follow-up: audit counters and the repeated story/quote card. */
+  .summary-card strong {
+    color: var(--ink);
+  }
+
+  .story-card {
+    background: #162238;
+    border: 1px solid #2a3b55;
+    color: var(--ink);
+  }
+  .story-card h2 { color: var(--ink); }
+  .story-card p { color: var(--muted); }
+  .story-card .section-kicker { color: #60a5fa; }
+
   @media (max-width: 760px) {
     .main-nav {
       background: var(--surface);
