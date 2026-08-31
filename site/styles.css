@@ -1157,3 +1157,206 @@ button.audit-module-head { cursor:pointer; }.module-status { width:9px; height:9
 
 /* Technical fetch failures are neutral: they are not site errors or warnings. */
 .status-unavailable{border-color:#e2e8f0!important;background:#f8fafc!important}.status-unavailable .status-dot{background:#94a3b8!important}.status-unavailable .result-message{color:#64748b!important}
+
+/* === Dark theme: first visual test === */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1120;
+    --surface: #111827;
+    --surface-2: #172033;
+    --ink: #e8eef7;
+    --muted: #9aa9bd;
+    --line: #263449;
+    --line-dark: #34445b;
+    --accent: #3b82f6;
+    --accent-dark: #2563eb;
+    --error: #f87171;
+    --error-bg: #291719;
+    --warning: #fbbf24;
+    --warning-bg: #2a2113;
+    --success: #4ade80;
+    --success-bg: #14251d;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .24);
+    --border: var(--line);
+    --blue: var(--accent);
+  }
+
+  .site-header {
+    background: rgba(11, 17, 32, .9);
+    border-bottom-color: rgba(52, 68, 91, .75);
+  }
+
+  .main-nav a,
+  .hero-lead,
+  .ghost-btn,
+  .filter-tab,
+  .cross-tool-links a,
+  .policy-page section p,
+  .analytics-notice p {
+    color: #b5c1d1;
+  }
+
+  .url-field,
+  .hero-panel,
+  .progress-card,
+  .results-card,
+  .summary-card,
+  .result-item,
+  .result-item-detail,
+  .feature-card,
+  .tool-card,
+  .audit-module,
+  .cross-tools,
+  .analytics-notice,
+  .robots-status {
+    background: var(--surface);
+  }
+
+  .url-field {
+    box-shadow: 0 15px 40px rgba(0, 0, 0, .2);
+  }
+  .url-field:focus-within {
+    box-shadow: 0 0 0 4px rgba(59,130,246,.16), 0 15px 40px rgba(0,0,0,.2);
+  }
+  .url-field input::placeholder,
+  .panel-toolbar,
+  .result-chevron,
+  .filter-tab span,
+  .module-counts em,
+  .module-arrow,
+  .module-preview-row em {
+    color: #718096;
+  }
+
+  .secondary-btn,
+  .filter-tab.active,
+  .tool-code {
+    background: #243044;
+    color: #f8fafc;
+    border-color: #34445b;
+  }
+  .secondary-btn:hover { background: #2d3b52; }
+  .ghost-btn:hover {
+    border-color: #52627a;
+    background: var(--surface-2);
+  }
+
+  .panel-toolbar,
+  .issue-box,
+  .preview-box,
+  .tool-badge {
+    background: var(--surface-2);
+  }
+  .traffic-lights i { background: #52627a; }
+  .score { border-color: #234534; }
+  .progress-track { background: #202c3e; }
+
+  .step.done { border-color: #28543c; }
+  .step.active {
+    background: #132744;
+    border-color: #28558b;
+  }
+
+  .summary-card:hover,
+  .tool-card:hover { border-color: #52627a; }
+  .summary-card.all .status-dot { background: #94a3b8; }
+
+  .filter-tab { background: var(--surface); }
+  .filter-tab.active span { color: #b8c4d4; }
+
+  .result-item.status-error { border-color: #593033; }
+  .result-item.status-warning { border-color: #5b4823; }
+  .result-item.status-success {
+    background: #111d18;
+    border-color: #294638;
+  }
+  .result-message,
+  .mini-row small { color: var(--muted); }
+  .result-item-detail { border-top-color: rgba(113,128,150,.28); }
+  .result-item-main:hover { filter: brightness(1.06); }
+
+  .load-more-btn {
+    border-color: #28558b;
+    background: #132744;
+    color: #60a5fa;
+  }
+  .load-more-btn:hover {
+    border-color: #3b82f6;
+    background: #183154;
+  }
+
+  .meta-item { color: #60a5fa; }
+  .meta-item code { color: var(--ink); }
+  .issue-box { color: #b5c1d1; }
+  .preview-label { color: var(--muted); }
+
+  .content-section.alt {
+    background: #0e1627;
+    border-block-color: var(--line);
+  }
+  .section-intro p,
+  .feature-card p,
+  .feature-card small,
+  .availability-note,
+  .nav-soon { color: var(--muted); }
+
+  .bottom-cta {
+    background: #101d33;
+    border-top-color: #263b5d;
+  }
+
+  .tool-icon {
+    background: #162b4a;
+    color: #60a5fa;
+  }
+  .tool-card.live {
+    border-color: #2b4f7d;
+    background: linear-gradient(180deg, #111827 0%, #121d30 100%);
+  }
+  .tool-badge { color: #aab7c8; }
+  .module-status.soon { background: #64748b; }
+  .audit-module-body { border-top-color: var(--line); }
+
+  .policy-page section { border-top-color: var(--line); }
+  .analytics-notice {
+    border-color: var(--line-dark);
+    box-shadow: 0 24px 70px rgba(0,0,0,.38);
+  }
+
+  .robots-status-icon {
+    background: #202c3e;
+    color: #aebbc9;
+  }
+  .robots-status-copy code { color: var(--muted); }
+  .robots-status.ok {
+    border-color: #28543c;
+    background: var(--success-bg);
+  }
+  .robots-status.ok .robots-status-icon { background: #1c3b2a; }
+  .robots-status.warn {
+    border-color: #5b4823;
+    background: var(--warning-bg);
+  }
+  .robots-status.warn .robots-status-icon { background: #443516; }
+  .robots-status.error {
+    border-color: #593033;
+    background: var(--error-bg);
+  }
+  .robots-status.error .robots-status-icon { background: #472326; }
+
+  .status-unavailable {
+    border-color: var(--line) !important;
+    background: var(--surface-2) !important;
+  }
+  .status-unavailable .status-dot { background: #718096 !important; }
+  .status-unavailable .result-message { color: var(--muted) !important; }
+
+  @media (max-width: 760px) {
+    .main-nav {
+      background: var(--surface);
+      border-color: var(--line);
+      box-shadow: 0 18px 45px rgba(0,0,0,.35);
+    }
+    .main-nav a:hover { background: var(--surface-2); }
+  }
+}
