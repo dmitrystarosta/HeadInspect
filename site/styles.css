@@ -1218,7 +1218,8 @@ footer > div a.footer-external::after{
 /* 2026-08-31 — RuStore badge: subtle outline in dark theme */
 @media (prefers-color-scheme: dark){
   .badge-link img[src*="rustore"]{
-    border:1px solid rgba(255,255,255,.55);
+    outline:1px solid #b8b8b8;
+    outline-offset:-1px;
     border-radius:6px;
   }
 }
