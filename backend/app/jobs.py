@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from time import monotonic
+from urllib.parse import urlsplit
 import uuid
 
 from fastapi import HTTPException
@@ -13,14 +14,17 @@ from fastapi import HTTPException
 from .audit import ACCESS_BLOCKED_STATUS_CODES, discover_audit_urls, run_pages
 from .config import (
     AUDIT_TIMEOUT,
+    DOMAIN_COOLDOWN_SECONDS,
     JOB_TTL_SECONDS,
     MAX_AUDIT_URLS,
     MAX_CONCURRENT_AUDITS,
+    MAX_JOBS,
     MAX_QUEUED_AUDITS,
     RATE_LIMIT_AUDITS,
     RATE_LIMIT_WINDOW_SECONDS,
 )
 from .models import AuditJobStatus, AuditResultsResponse, JobStatus, PageResult
+from .security import normalize_public_url
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -61,6 +65,39 @@ BLOCK_DETECT_RATIO = 0.9
 BLOCK_DETECT_STATUS_CODES = ACCESS_BLOCKED_STATUS_CODES
 
 
+# --- Domain cooldown (see JobManager._cooldown_site_key / JobManager.create)
+#
+# Semantics, decided up front so the reasoning lives in one place:
+#
+# - **Site key**: the lowercased hostname from normalize_public_url() - the
+#   same normalization already used to validate every audit URL - and
+#   nothing else. Scheme (http/https), explicit default port, path, query
+#   string and fragment are all ignored: none of them identify a
+#   *different* site to audit, and letting any of them vary the key would
+#   make the cooldown trivial to bypass by editing the URL. www/non-www are
+#   deliberately kept as *separate* keys: HeadInspect never aliases them
+#   from the URL string alone anywhere else in the codebase - the only
+#   place it treats them as the same site is discover_audit_urls, and only
+#   *after* actually following a same-site redirect on the entry page (see
+#   tests/test_www_nonwww.py). Guessing that equivalence here, before any
+#   request has been made, would be a new rule invented just for this
+#   feature, not the existing one.
+# - **Starts at job creation** (i.e. the moment the job is accepted into
+#   the queue), not at the start of execution or at completion. The heavy
+#   cost this protects against - real HTTP requests hitting the audited
+#   site - begins essentially as soon as the job is accepted (queue wait is
+#   bounded by MAX_QUEUED_AUDITS/MAX_CONCURRENT_AUDITS and is normally
+#   short), and recording it at creation, in the same place and using the
+#   same `now` as RATE_LIMIT_AUDITS's per-IP bookkeeping, needs no
+#   additional coordination with the background `_run` task.
+# - **Applies regardless of outcome.** A job that ends up `failed` or
+#   `completed_partial` still made real requests against the site before
+#   that happened (DNS + entry fetch, and often much more) - the cooldown
+#   is not lifted or shortened for those, only for one reason: it was
+#   never armed in the first place, because the URL failed even basic
+#   normalization (see _cooldown_site_key) and so never reached the site.
+
+
 @dataclass
 class Job:
     job_id: str
@@ -98,11 +135,64 @@ class JobManager:
         self._cleanup_lock = asyncio.Lock()
         self._create_lock = asyncio.Lock()
         self._rate_attempts: dict[str, deque[float]] = defaultdict(deque)
+        # site key (see _cooldown_site_key) -> monotonic time the most
+        # recent audit of that site was created.
+        self._domain_cooldowns: dict[str, float] = {}
+
+    @staticmethod
+    def _cooldown_site_key(requested_url: str) -> str | None:
+        """The key domain cooldown is tracked under - see the module-level
+        comment above BLOCK_DETECT_STATUS_CODES for the full reasoning.
+        Returns None if the URL doesn't even pass basic normalization; such
+        a URL is not blocked by cooldown here, it simply fails later, same
+        as it already does today once the job actually runs.
+        """
+        try:
+            normalized = normalize_public_url(requested_url)
+        except HTTPException:
+            return None
+        return urlsplit(normalized).hostname
 
     async def create(self, requested_url: str, *, client_ip: str) -> Job:
         await self.cleanup()
 
         async with self._create_lock:
+            if len(self.jobs) >= MAX_JOBS:
+                # cleanup() just above only evicts while strictly *over*
+                # MAX_JOBS (see its MAX_JOBS handling) - sitting exactly
+                # *at* the cap is deliberately left alone there, since
+                # cleanup() on its own has no reason to assume a new job is
+                # about to be added. Here we DO know that, so make room for
+                # exactly the one job this call is about to create: evict
+                # the single oldest safely-finished job (same criterion as
+                # cleanup() - completed_at is not None - so queued/running/
+                # discovering are never candidates), if one exists. Only if
+                # every one of MAX_JOBS jobs is still active (not reachable
+                # today: MAX_QUEUED_AUDITS + MAX_CONCURRENT_AUDITS is far
+                # below MAX_JOBS) does this fall through to the 503 below -
+                # never unbounded growth, never a crash, never touches an
+                # active job.
+                oldest_finished = min(
+                    (job for job in self.jobs.values() if job.completed_at is not None),
+                    key=lambda job: job.completed_at,
+                    default=None,
+                )
+                if oldest_finished is not None:
+                    self.jobs.pop(oldest_finished.job_id, None)
+                else:
+                    logger.warning(
+                        "Audit rejected: MAX_JOBS reached (%s/%s), ip=%s, url=%s",
+                        len(self.jobs),
+                        MAX_JOBS,
+                        client_ip,
+                        requested_url,
+                    )
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Сервис сейчас занят: достигнут предел одновременно хранимых проверок. Попробуйте через несколько минут.",
+                        headers={"Retry-After": "60"},
+                    )
+
             queued_count = sum(1 for job in self.jobs.values() if job.status == "queued")
             if queued_count >= MAX_QUEUED_AUDITS:
                 logger.warning(
@@ -141,7 +231,33 @@ class JobManager:
                     headers={"Retry-After": str(retry_after)},
                 )
 
+            site_key = self._cooldown_site_key(requested_url)
+            if site_key is not None:
+                last_started = self._domain_cooldowns.get(site_key)
+                if last_started is not None:
+                    site_elapsed = now - last_started
+                    if site_elapsed < DOMAIN_COOLDOWN_SECONDS:
+                        site_retry_after = max(1, int(DOMAIN_COOLDOWN_SECONDS - site_elapsed + 0.999))
+                        logger.warning(
+                            "Audit rejected: domain cooldown active (%s), retry_after=%ss, ip=%s, url=%s",
+                            site_key,
+                            site_retry_after,
+                            client_ip,
+                            requested_url,
+                        )
+                        raise HTTPException(
+                            status_code=429,
+                            detail=(
+                                "Этот сайт уже проверялся недавно. Полный аудит одного и того же сайта "
+                                f"можно запускать не чаще, чем раз в {_format_wait(DOMAIN_COOLDOWN_SECONDS)}. "
+                                f"Следующую проверку этого сайта можно запустить через {_format_wait(site_retry_after)}."
+                            ),
+                            headers={"Retry-After": str(site_retry_after)},
+                        )
+
             attempts.append(now)
+            if site_key is not None:
+                self._domain_cooldowns[site_key] = now
             job = Job(job_id=uuid.uuid4().hex, requested_url=requested_url, client_ip=client_ip)
             self.jobs[job.job_id] = job
 
@@ -453,6 +569,29 @@ class JobManager:
             for job_id in stale:
                 self.jobs.pop(job_id, None)
 
+            # MAX_JOBS: same "safely finished" criterion as TTL above
+            # (completed_at is not None - queued/running/discovering jobs
+            # are never candidates), oldest-finished-first, evicting only as
+            # many as needed to get back under the cap. This runs *after*
+            # the TTL pass above, so a job that's both over MAX_JOBS and
+            # past its TTL is simply already gone by this point - no double
+            # bookkeeping. Deliberately only fires while strictly *over* the
+            # cap - sitting exactly *at* MAX_JOBS is left alone here, since
+            # cleanup() has no reason to assume a new job is about to be
+            # added; create()'s own backstop (see above) makes room for
+            # exactly one more job when it's the one asking. If everything
+            # left is still active, nothing is evicted here (not reachable
+            # today - see MAX_JOBS in config.py); create()'s backstop still
+            # caps the dict regardless.
+            if len(self.jobs) > MAX_JOBS:
+                finished = sorted(
+                    (job for job in self.jobs.values() if job.completed_at is not None),
+                    key=lambda job: job.completed_at,
+                )
+                overflow = len(self.jobs) - MAX_JOBS
+                for job in finished[:overflow]:
+                    self.jobs.pop(job.job_id, None)
+
             # Keep the in-memory rate-limit map small on a long-running service.
             now = monotonic()
             rate_cutoff = now - RATE_LIMIT_WINDOW_SECONDS
@@ -464,6 +603,17 @@ class JobManager:
                     empty_ips.append(ip)
             for ip in empty_ips:
                 self._rate_attempts.pop(ip, None)
+
+            # Same idea for the domain-cooldown map: an entry is only ever
+            # useful while its cooldown window hasn't expired yet.
+            cooldown_cutoff = now - DOMAIN_COOLDOWN_SECONDS
+            expired_sites = [
+                site
+                for site, started in self._domain_cooldowns.items()
+                if started <= cooldown_cutoff
+            ]
+            for site in expired_sites:
+                self._domain_cooldowns.pop(site, None)
 
 
 job_manager = JobManager()

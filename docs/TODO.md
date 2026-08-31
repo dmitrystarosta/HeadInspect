@@ -12,13 +12,31 @@
 
 ### Защита API и устойчивость
 
-- [ ] Добавить cooldown для повторного запуска аудита одного домена.
+- [x] Добавить cooldown для повторного запуска аудита одного домена.
   - Ориентир: 10 минут.
   - Цель: не позволять многократно запускать тяжёлый аудит одного и того же сайта.
+  - Выполнено: 2026-08-31.
+  - Ключ cooldown — hostname из normalize_public_url() (без учёта
+    схемы/порта/пути/query/fragment, www/non-www остаются раздельными -
+    как и в остальном коде HeadInspect). Отсчёт с момента создания job,
+    не снимается для failed/completed_partial. Ответ API: 429 с
+    Retry-After и понятным текстом, существующий контракт не менялся.
+  - `backend/app/config.py` (`DOMAIN_COOLDOWN_SECONDS`),
+    `backend/app/jobs.py` (`JobManager.create`, `_cooldown_site_key`).
+  - Тесты: `backend/tests/test_domain_cooldown.py`.
 
-- [ ] Ограничить общее количество audit jobs, хранящихся backend.
+- [x] Ограничить общее количество audit jobs, хранящихся backend.
   - Ориентир: максимум 200 jobs.
   - Старые завершённые jobs удалять первыми.
+  - Выполнено: 2026-08-31.
+  - Удаляются только безопасно завершённые jobs (`completed_at is not
+    None`), самые старые первыми, в рамках существующего `cleanup()` -
+    не отдельный параллельный механизм. queued/running/discovering
+    никогда не удаляются. При отсутствии удаляемых jobs `create()`
+    возвращает понятную ошибку 503 вместо неконтролируемого роста.
+  - `backend/app/config.py` (`MAX_JOBS`), `backend/app/jobs.py`
+    (`JobManager.cleanup`, `JobManager.create`).
+  - Тесты: `backend/tests/test_max_jobs.py`.
 
 - [ ] Наблюдать за поведением больших аудитов после исправления `PAGE_TIMEOUT`.
   - Проверять частоту `completed_partial`.

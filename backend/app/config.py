@@ -33,6 +33,24 @@ GLOBAL_MAX_CONCURRENT_FETCHES = PAGE_CONCURRENCY
 RATE_LIMIT_AUDITS = 3
 RATE_LIMIT_WINDOW_SECONDS = 2 * 60
 
+# Minimum time between two audits *of the same site*, regardless of who
+# requests them or from which IP - protects the audited site's own server
+# from repeated full crawls in quick succession. Independent of (and in
+# addition to) RATE_LIMIT_AUDITS above, which limits one client's request
+# rate but does nothing to stop two different visitors (or the same one
+# from two IPs) from both launching a full crawl of the same site back to
+# back. See JobManager._cooldown_site_key / JobManager.create.
+DOMAIN_COOLDOWN_SECONDS = 10 * 60
+
+# Hard ceiling on how many Job objects the backend keeps in memory at once,
+# independent of JOB_TTL_SECONDS (a job can be evicted for being over this
+# count before it is old enough for TTL, or vice versa - both apply).
+# Safely-finished jobs are evicted oldest-first once this is reached; queued
+# and running jobs are never touched (see JobManager.cleanup). Kept well
+# above MAX_QUEUED_AUDITS + MAX_CONCURRENT_AUDITS so it is never reached by
+# active jobs alone under today's other limits.
+MAX_JOBS = 200
+
 MAX_HTML_BYTES = 2 * 1024 * 1024
 MAX_SITEMAP_BYTES = 5 * 1024 * 1024
 MAX_ROBOTS_BYTES = 512 * 1024
