@@ -41,6 +41,14 @@ function queryAllDescendants(root, selector, results) {
 }
 
 export function makeEl(tag) {
+  // Real (if minimal) event storage/dispatch, added for item under test:
+  // driving app.js's actual `form.addEventListener("submit", ...)` handler
+  // from a test needs listeners that are actually stored and callable, not
+  // the previous total no-op stub. Existing tests never call
+  // dispatchEvent/requestSubmit, so this is purely additive - nothing that
+  // doesn't opt in is affected.
+  const listeners = new Map();
+
   const el = {
     tagName: (tag || "div").toUpperCase(),
     children: [],
@@ -73,12 +81,22 @@ export function makeEl(tag) {
       String(v).split(/\s+/).filter(Boolean).forEach(c => this.classList._set.add(c));
     },
     get textContent() { return this._text; },
-    set textContent(v) { this._text = v; },
+    set textContent(v) { this._text = v == null ? "" : String(v); },
     get innerHTML() { return this._html || ""; },
     set innerHTML(v) { this._html = v; },
     setAttribute(k, v) { this.attributes[k] = v; },
     getAttribute(k) { return this.attributes[k] !== undefined ? this.attributes[k] : null; },
-    addEventListener() {},
+    addEventListener(type, fn) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(fn);
+    },
+    removeEventListener(type, fn) {
+      listeners.get(type)?.delete(fn);
+    },
+    dispatchEvent(event) {
+      for (const fn of [...(listeners.get(event.type) || [])]) fn(event);
+      return true;
+    },
     appendChild(c) { c._parent = this; this.children.push(c); return c; },
     prepend(c) { c._parent = this; this.children.unshift(c); return c; },
     replaceChildren() {},
@@ -95,6 +113,13 @@ export function makeEl(tag) {
       }
     },
   };
+  if ((tag || "").toLowerCase() === "form") {
+    // Real <form>.requestSubmit() fires a genuine "submit" event (which
+    // app.js's handler calls event.preventDefault() on) - close enough to
+    // let a test drive the actual submit handler instead of calling an
+    // unexported internal function.
+    el.requestSubmit = () => { el.dispatchEvent({ type: "submit", preventDefault() {} }); };
+  }
   return el;
 }
 

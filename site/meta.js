@@ -141,23 +141,28 @@ async function startAudit(url) {
   pollAbortController = new AbortController();
   const signal = pollAbortController.signal;
 
+  // Deliberately no UI teardown before this call: if it rejects (domain
+  // cooldown 429, rate limit, queue full, network error, ...), whatever
+  // was already on screen - most importantly a previously completed
+  // report - must be left exactly as it was. Only once the backend has
+  // actually accepted the new audit do we clear the old state and switch
+  // into the "new audit in progress" view.
+  const created = await apiFetch("/api/audits", {
+    method: "POST",
+    body: JSON.stringify({ url: url.href }),
+    signal
+  });
+
   workspace.hidden = false;
   resultsCard.hidden = true;
   progressCard.hidden = false;
   workspace.scrollIntoView({ behavior: "smooth", block: "start" });
 
   currentRows = [];
-  currentJobId = null;
   resetSteps();
   updateProgressUi({ status: "queued", discovered_urls: 0, checked_urls: 0, progress_percent: 0, normalized_url: null });
   $("#audit-host").textContent = url.hostname;
   setStep("site", "active");
-
-  const created = await apiFetch("/api/audits", {
-    method: "POST",
-    body: JSON.stringify({ url: url.href }),
-    signal
-  });
 
   currentJobId = created.job_id;
   setAuditContext(currentJobId, url.href);
@@ -396,10 +401,13 @@ if (form) {
     } catch (error) {
       const message = describeError(error, "Не удалось запустить проверку. Попробуйте позже.");
       if (message === null) return; // aborted
-      progressCard.hidden = true;
-      workspace.hidden = false;
+      // startAudit() only tears down the previous view *after* the new
+      // audit is accepted (see its comment) - so on any failure here
+      // (domain cooldown 429, rate limit, queue full, network error, ...)
+      // workspace/progressCard/resultsCard are untouched: if a previous
+      // report was showing, it's still showing. Just surface the error
+      // near the form, without hiding anything that was already visible.
       showFormError(message);
-      workspace.hidden = true;
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSubmitting(false);

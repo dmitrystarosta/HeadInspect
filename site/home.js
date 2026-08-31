@@ -248,6 +248,18 @@ async function startAudit(url) {
   pollAbortController = new AbortController();
   const signal = pollAbortController.signal;
 
+  // Deliberately no UI teardown before this call: if it rejects (domain
+  // cooldown 429, rate limit, queue full, network error, ...), whatever
+  // was already on screen - most importantly a previously completed
+  // report - must be left exactly as it was. Only once the backend has
+  // actually accepted the new audit do we clear the old state and switch
+  // into the "new audit in progress" view.
+  const created = await apiFetch("/api/audits", {
+    method: "POST",
+    body: JSON.stringify({ url: url.href }),
+    signal
+  });
+
   workspace.hidden = false;
   resultsCard.hidden = true;
   progressCard.hidden = false;
@@ -260,11 +272,6 @@ async function startAudit(url) {
   setStep("site", "active");
   workspace.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  const created = await apiFetch("/api/audits", {
-    method: "POST",
-    body: JSON.stringify({ url: url.href }),
-    signal
-  });
   setHomeAuditUrl(created.job_id, url.href);
   setSubmitting(false);
 
@@ -312,7 +319,12 @@ form?.addEventListener("submit", async event => {
   } catch (error) {
     const message = describeError(error, "Не удалось запустить проверку. Попробуйте позже.");
     if (message === null) return; // aborted
-    workspace.hidden = true;
+    // startAudit() only tears down the previous view *after* the new
+    // audit is accepted (see its comment) - so on any failure here
+    // (domain cooldown 429, rate limit, queue full, network error, ...)
+    // workspace/progressCard/resultsCard are untouched: if a previous
+    // report was showing, it's still showing. Just surface the error
+    // near the form, without hiding anything that was already visible.
     showError(message);
     window.scrollTo({ top: 0, behavior: "smooth" });
   } finally {
