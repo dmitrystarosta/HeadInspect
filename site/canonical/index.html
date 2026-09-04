@@ -1,18 +1,388 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Проверка canonical всего сайта — HeadInspect</title><meta name="description" content="Проверка canonical на всех страницах: отсутствие, self-canonical, ссылки на другие URL, редиректы и битые цели."><meta name="robots" content="noindex,follow"><meta name="theme-color" content="#0f172a"><link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Проверка canonical всего сайта — HeadInspect</title>
+  <meta name="description" content="Проверьте rel=canonical сразу на всех страницах сайта: отсутствие тега, self-canonical, ссылки на другие страницы, дубли, конфликты HTML и HTTP Link, цепочки и циклы.">
+  <meta name="keywords" content="проверка canonical, rel canonical, каноническая ссылка, self-canonical, дубли страниц, SEO аудит сайта, массовая проверка canonical">
+  <meta name="theme-color" content="#0f172a">
+  <meta property="og:title" content="Проверка canonical всего сайта — HeadInspect">
+  <meta property="og:description" content="Массовая проверка rel=canonical на страницах сайта: наличие, self-canonical, конфликты, цепочки и циклы.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://headinspect.ru/canonical/">
+  <meta property="og:site_name" content="HeadInspect">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:image" content="https://headinspect.ru/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:alt" content="HeadInspect — массовая техническая проверка сайта">
+  <link rel="canonical" href="https://headinspect.ru/canonical/">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="stylesheet" href="../styles.css"></head><body>
-<header class="site-header"><div class="shell header-inner"><a class="brand" href="/"><img class="brand-logo" src="../headinspect-logo-36.webp" srcset="../headinspect-logo-36.webp 1x, ../headinspect-logo-72.webp 2x" width="36" height="36" alt=""><span>HeadInspect</span></a><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"><span class="sr-only">Открыть меню</span><span></span><span></span><span></span></button><nav id="main-nav" class="main-nav tools-nav" aria-label="Инструменты HeadInspect">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://headinspect.ru/#website",
+      "url": "https://headinspect.ru/",
+      "name": "HeadInspect",
+      "inLanguage": "ru-RU",
+      "description": "HeadInspect — бесплатный сервис массовой технической проверки страниц сайта.",
+      "publisher": { "@id": "https://headinspect.ru/#creator" }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://headinspect.ru/#creator",
+      "name": "Dmitry Starosta",
+      "url": "https://dmitrystarosta.github.io/projects/"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://headinspect.ru/canonical/#webpage",
+      "url": "https://headinspect.ru/canonical/",
+      "name": "Проверка canonical всего сайта — HeadInspect",
+      "description": "Массовая проверка rel=canonical на страницах сайта: наличие, self-canonical, конфликты, цепочки и циклы.",
+      "inLanguage": "ru-RU",
+      "isPartOf": { "@id": "https://headinspect.ru/#website" },
+      "mainEntity": { "@id": "https://headinspect.ru/canonical/#app" }
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://headinspect.ru/canonical/#app",
+      "name": "Проверка canonical всего сайта",
+      "url": "https://headinspect.ru/canonical/",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Любая ОС с современным веб-браузером",
+      "inLanguage": "ru-RU",
+      "description": "Проверяет rel=canonical на страницах сайта: отсутствие, self-canonical, ссылки на другие страницы, дубли, конфликты HTML и HTTP Link, цепочки и циклы.",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "RUB" },
+      "creator": { "@id": "https://headinspect.ru/#creator" },
+      "isPartOf": { "@id": "https://headinspect.ru/#website" }
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="/" aria-label="HeadInspect — на главную">
+        <img class="brand-logo" src="../headinspect-logo-36.webp" srcset="../headinspect-logo-36.webp 1x, ../headinspect-logo-72.webp 2x" width="36" height="36" alt="" aria-hidden="true">
+        <span>HeadInspect</span>
+      </a>
+
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav">
+        <span class="sr-only">Открыть меню</span>
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav id="main-nav" class="main-nav tools-nav" aria-label="Инструменты HeadInspect">
         <a href="/open-graph/">Open Graph</a>
         <a href="/meta/">Meta</a>
-        <a href="/canonical/">Canonical <span class="nav-soon">скоро</span></a>
+        <a href="/canonical/" aria-current="page">Canonical</a>
         <a href="/schema/">Schema</a>
         <a href="/images/">Images <span class="nav-soon">скоро</span></a>
         <a href="/sitemap/">Sitemap</a>
-      </nav></div></header>
-<main id="top"><section class="hero placeholder-hero"><div class="shell placeholder-hero-inner"><div class="eyebrow">CANONICAL · SITE-WIDE AUDIT</div><div class="tool-badge big">Скоро</div><h1>Проверка canonical всего сайта</h1><p class="hero-lead">Проверка canonical на всех страницах: отсутствие, self-canonical, ссылки на другие URL, редиректы и битые цели.</p><div class="coming-form"><div class="url-field disabled"><span class="url-icon">⌁</span><input type="url" placeholder="https://example.ru" disabled><button class="primary-btn" type="button" disabled>Проверить сайт</button></div><p>Модуль ещё не запущен. Когда он появится, здесь будет работать тот же массовый аудит до 500 страниц.</p></div><div class="placeholder-actions"><a class="primary-btn link-btn" href="/open-graph/">Проверить Open Graph</a><a class="primary-btn link-btn" href="/meta/">Проверить Meta</a><a class="ghost-btn link-btn" href="/">Все инструменты</a></div></div></section>
-<section class="content-section"><div class="shell"><div class="section-intro"><div class="section-kicker">ЧТО БУДЕТ ПРОВЕРЯТЬСЯ</div><h2>Канонические URL <span>на всём сайте.</span></h2><p>Страница уже занимает своё место в архитектуре HeadInspect. После запуска здесь появится специализированный результат, а модуль войдёт и в общий аудит на главной.</p></div><div class="feature-grid"><article class="feature-card"><span class="feature-num">01</span><h3>наличие rel="canonical"</h3><p>наличие rel="canonical"</p></article><article class="feature-card"><span class="feature-num">02</span><h3>self-canonical</h3><p>self-canonical</p></article><article class="feature-card"><span class="feature-num">03</span><h3>canonical на другую страницу</h3><p>canonical на другую страницу</p></article><article class="feature-card"><span class="feature-num">04</span><h3>canonical на redirect</h3><p>canonical на redirect</p></article><article class="feature-card"><span class="feature-num">05</span><h3>битые canonical</h3><p>битые canonical</p></article><article class="feature-card"><span class="feature-num">06</span><h3>конфликты с URL страницы</h3><p>конфликты с URL страницы</p></article></div></div></section>
-<section class="cross-tools"><div class="shell cross-tools-inner"><div><strong>Уже работают Open Graph и Meta</strong><span>Оба модуля можно запускать отдельно или вместе из общего аудита сайта.</span></div><div class="cross-tool-links"><a href="/open-graph/">Open Graph →</a><a href="/meta/">Meta →</a></div></div></section>
-</main><footer class="site-footer" id="site-footer"></footer><script src="/footer.js"></script><script src="../shell.js"></script><script src="/consent.js"></script>
-</body></html>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">МАССОВАЯ ПРОВЕРКА CANONICAL</div>
+          <h1>Проверьте canonical <span>всего сайта</span></h1>
+          <p class="hero-lead">
+            Введите адрес сайта один раз. HeadInspect найдёт sitemap, проверит страницы и покажет,
+            где canonical отсутствует, ссылается сам на себя, ведёт на другую страницу, дублируется
+            или конфликтует между HTML и HTTP-заголовком.
+          </p>
+
+          <form id="audit-form" class="audit-form" novalidate>
+            <label class="sr-only" for="site-url">Адрес сайта</label>
+            <div class="url-field">
+              <span class="url-icon" aria-hidden="true">⌁</span>
+              <input id="site-url" name="site-url" type="url" inputmode="url"
+                     autocomplete="url" placeholder="https://example.ru" required>
+              <button class="primary-btn" type="submit">Проверить сайт</button>
+            </div>
+            <p id="form-error" class="form-error" role="alert" hidden></p>
+          </form>
+
+          <div class="hero-meta">
+            <span>✓ Бесплатно</span>
+            <span>✓ Без регистрации</span>
+            <span>✓ До 500 страниц</span>
+          </div>
+        </div>
+
+        <aside class="hero-panel meta-hero-panel" aria-label="Пример результата Canonical-аудита">
+          <div class="panel-toolbar">
+            <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>headinspect.ru/canonical/</span>
+          </div>
+          <div class="mini-report">
+            <div class="mini-top">
+              <div>
+                <span class="mini-label">Проверка завершена</span>
+                <strong>127 страниц</strong>
+              </div>
+              <span class="score">88%</span>
+            </div>
+            <div class="mini-stats">
+              <div class="mini-stat error"><b>4</b><span>ошибки</span></div>
+              <div class="mini-stat warning"><b>11</b><span>предупреждения</span></div>
+              <div class="mini-stat success"><b>112</b><span>OK</span></div>
+            </div>
+            <div class="mini-rows">
+              <div class="mini-row bad"><span>●</span><code>/catalog/item-2</code><small>canonical на noindex</small></div>
+              <div class="mini-row warn"><span>●</span><code>/blog/</code><small>canonical не указан</small></div>
+              <div class="mini-row good"><span>●</span><code>/</code><small>self-canonical OK</small></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="cross-tools">
+      <div class="shell cross-tools-inner">
+        <div><strong>Переключайтесь между результатами аудита</strong><span>После общего аудита можно открывать другие модули без повторного сканирования сайта.</span></div>
+        <div class="cross-tool-links"><a href="/">Общий аудит</a><a href="/open-graph/">Open Graph</a><a href="/meta/">Meta</a><a href="/schema/">Schema</a><a href="/images/">Images <small>скоро</small></a><a href="/sitemap/">Sitemap</a></div>
+      </div>
+    </section>
+
+    <section id="audit-workspace" class="audit-workspace" hidden>
+      <div class="shell">
+        <div id="progress-card" class="progress-card">
+          <div class="section-kicker">АУДИТ</div>
+          <div class="progress-heading">
+            <div>
+              <h2>Проверяем <span id="audit-host">example.ru</span></h2>
+              <p>HeadInspect последовательно находит карту сайта и анализирует страницы.</p>
+            </div>
+            <strong id="progress-percent">0%</strong>
+          </div>
+
+          <div class="progress-track" aria-hidden="true">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+
+          <div class="progress-steps" aria-live="polite">
+            <div class="step" data-step="site"><span>○</span> Сайт доступен</div>
+            <div class="step" data-step="robots"><span>○</span> robots.txt найден</div>
+            <div class="step" data-step="sitemap"><span>○</span> sitemap найден</div>
+            <div class="step" data-step="urls"><span>○</span> найдено <b id="found-count">0</b> страниц</div>
+            <div class="step" data-step="scan"><span>○</span> проверено <b id="checked-count">0</b> из <b id="total-count">0</b></div>
+          </div>
+        </div>
+
+        <div id="results-card" class="results-card" hidden>
+          <div class="results-head">
+            <div>
+              <div class="section-kicker">РЕЗУЛЬТАТ</div>
+              <h2>Проверка завершена</h2>
+              <p><strong id="result-total">0</strong> страниц проверено<span id="result-unavailable-summary" hidden> · Не удалось проверить: <strong id="result-unavailable">0</strong></span></p>
+            </div>
+            <div class="results-actions">
+              <button id="download-btn" class="secondary-btn" type="button" title="Экспорт Excel — следующий этап">Скачать Excel</button>
+              <button id="restart-btn" class="ghost-btn" type="button">Проверить заново</button>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <button class="summary-card error active-filter" data-filter="error" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-errors">0</strong>
+              <small>Ошибки</small>
+            </button>
+            <button class="summary-card warning" data-filter="warning" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-warnings">0</strong>
+              <small>Предупреждения</small>
+            </button>
+            <button class="summary-card success" data-filter="success" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-ok">0</strong>
+              <small>OK</small>
+            </button>
+            <button class="summary-card all" data-filter="all" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-all">0</strong>
+              <small>Все страницы</small>
+            </button>
+          </div>
+
+          <div class="table-toolbar">
+            <div class="filter-tabs" role="group" aria-label="Фильтр результатов">
+              <button class="filter-tab active" data-filter="problems" type="button">Проблемы <span id="tab-problems">0</span></button>
+              <button class="filter-tab" data-filter="error" type="button">Ошибки <span id="tab-errors">0</span></button>
+              <button class="filter-tab" data-filter="warning" type="button">Предупреждения <span id="tab-warnings">0</span></button>
+              <button class="filter-tab" data-filter="unavailable" type="button">Без ответа <span id="tab-unavailable">0</span></button>
+              <button class="filter-tab" data-filter="success" type="button">OK <span id="tab-ok">0</span></button>
+              <button class="filter-tab" data-filter="all" type="button">Все <span id="tab-all">0</span></button>
+            </div>
+            <div class="toolbar-note">Страница → Canonical → результат. Нажмите на строку, чтобы раскрыть подробности</div>
+          </div>
+
+          <div id="result-list" class="result-list" aria-live="polite"></div>
+          <div id="empty-state" class="empty-state" hidden>По этому фильтру ничего не найдено.</div>
+          <button id="load-more-btn" class="load-more-btn" type="button" hidden>Показать ещё</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="content-section">
+      <div class="shell">
+        <div class="section-intro">
+          <div class="section-kicker">ВОЗМОЖНОСТИ</div>
+          <h2>Не один URL. <span>Весь сайт.</span></h2>
+          <p>
+            Canonical-модуль помогает после массовых обновлений найти страницы, где каноническая
+            ссылка потеряна, указывает не туда или противоречит сама себе.
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="feature-num">01</span>
+            <h3>Наличие и self-canonical</h3>
+            <p>Есть ли rel=canonical, ссылается ли страница сама на себя или на другой URL.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">02</span>
+            <h3>Дубли и конфликты</h3>
+            <p>Несколько canonical, разные адреса, а также расхождение между HTML и HTTP-заголовком Link.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">03</span>
+            <h3>Форма и разрешение URL</h3>
+            <p>Абсолютный и относительный canonical, учёт &lt;base href&gt;, фрагменты и query-параметры.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">04</span>
+            <h3>Цель canonical</h3>
+            <p>Если целевая страница уже в аудите — её статус, редирект и noindex учитываются без лишних запросов.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">05</span>
+            <h3>Цепочки и циклы</h3>
+            <p>A → B → C и циклы A → B → A определяются по фактически проверенным страницам сайта.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">06</span>
+            <h3>Понятные рекомендации</h3>
+            <p>Красный — ошибка, жёлтый — предупреждение, зелёный — всё в порядке. Cross-domain и относительный canonical не считаются ошибкой.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="content-section alt">
+      <div class="shell">
+        <div class="section-intro narrow">
+          <div class="section-kicker">КАК ЭТО РАБОТАЕТ</div>
+          <h2>Четыре шага вместо ручной проверки каждой страницы</h2>
+        </div>
+
+        <ol class="steps-grid">
+          <li><span>1</span><div><h3>Введите сайт</h3><p>Достаточно адреса домена.</p></div></li>
+          <li><span>2</span><div><h3>Найдём sitemap</h3><p>Сначала robots.txt, затем карта сайта.</p></div></li>
+          <li><span>3</span><div><h3>Проверим canonical</h3><p>До 500 URL за один аудит, без обхода сторонних сайтов.</p></div></li>
+          <li><span>4</span><div><h3>Исправьте проблемы</h3><p>Откройте нужную страницу прямо из отчёта.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="story-section">
+      <div class="shell story-card">
+        <div class="story-mark">“</div>
+        <div>
+          <div class="section-kicker">ЗАЧЕМ HEADINSPECT</div>
+          <h2>Один неверный canonical может убрать страницу из индекса.</h2>
+          <p>
+            Canonical сообщает поисковику, какая версия страницы главная. Если он ведёт на noindex,
+            на страницу с ошибкой, на бесконечный редирект или конфликтует между HTML и HTTP-заголовком,
+            поисковые системы могут проиндексировать не то, что вы ожидаете. Canonical-модуль HeadInspect
+            ищет такие места сразу по всему сайту.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="content-section">
+      <div class="shell">
+        <div class="section-intro narrow">
+          <div class="section-kicker">FAQ</div>
+          <h2>Частые вопросы</h2>
+        </div>
+
+        <div class="faq-list">
+          <details>
+            <summary>Отсутствие canonical — это ошибка?</summary>
+            <p>Технически тег rel=canonical не обязателен. Но HeadInspect — аудитор, поэтому страницу без canonical мы помечаем предупреждением, чтобы вы видели, где поисковик выбирает каноническую версию сам.</p>
+          </details>
+          <details>
+            <summary>Cross-domain canonical — это плохо?</summary>
+            <p>Нет. Canonical на другой домен допустим стандартом (например, при синдикации контента). HeadInspect показывает это информационно и не считает ошибкой.</p>
+          </details>
+          <details>
+            <summary>Относительный canonical считается проблемой?</summary>
+            <p>Нет, если он корректно разрешается относительно адреса страницы (с учётом &lt;base href&gt;). HeadInspect показывает разрешённый абсолютный URL в подробностях строки.</p>
+          </details>
+          <details>
+            <summary>Проверяете ли вы доступность целевой страницы canonical?</summary>
+            <p>Только если она уже входит в текущий аудит. HeadInspect не делает дополнительных сетевых запросов ради canonical и не обходит сторонние сайты. Если цель не проверялась, так и указано — без ошибки.</p>
+          </details>
+          <details>
+            <summary>Учитываете ли вы noindex у целевой страницы?</summary>
+            <p>Да. noindex определяется по &lt;meta name="robots"&gt; и HTTP-заголовку X-Robots-Tag. Canonical на noindex-страницу — конфликт сигналов, помечается ошибкой.</p>
+          </details>
+          <details>
+            <summary>HeadInspect что-нибудь меняет на сайте?</summary>
+            <p>Нет. Аудит только читает публично доступные страницы и их метаданные.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="bottom-cta">
+      <div class="shell bottom-cta-inner">
+        <div>
+          <div class="section-kicker">HEADINSPECT</div>
+          <h2>Проверьте canonical всего сайта.</h2>
+        </div>
+        <a class="primary-btn link-btn" href="#top">Проверить сайт</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="site-footer"></footer>
+<script src="/footer.js"></script>
+
+  <template id="detail-template">
+    <div class="detail-panel meta-detail-panel">
+      <div class="detail-copy">
+        <div class="detail-title"></div>
+        <div class="meta-list"></div>
+        <div class="issue-box"></div>
+        <div class="detail-actions"></div>
+      </div>
+    </div>
+  </template>
+
+  <script src="/common.js"></script>
+  <script src="../canonical.js"></script>
+<script src="/consent.js"></script>
+</body>
+</html>

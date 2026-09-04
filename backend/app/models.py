@@ -59,6 +59,50 @@ class SchemaData(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class CanonicalData(BaseModel):
+    # --- Phase A: from this page's own HTML + response headers, no network.
+    present: bool = False
+    count: int = 0                      # distinct canonical *targets* found
+    html_count: int = 0                 # <link rel="canonical"> tags seen
+    header_count: int = 0               # Link: rel="canonical" values seen
+    raw_href: str | None = None         # first raw href, as written
+    raw_hrefs: list[str] = Field(default_factory=list)
+    resolved_url: str | None = None     # chosen canonical, absolute
+    source: Literal["none", "html", "header", "both"] = "none"
+    is_relative: bool = False
+    empty_href: bool = False
+    valid_url: bool = False
+    is_self: bool | None = None
+    same_site: bool | None = None
+    cross_domain: bool | None = None
+    scheme_mismatch: bool | None = None
+    host_variant_mismatch: bool | None = None  # www vs non-www vs the page
+    has_fragment: bool = False
+    has_query: bool = False
+    base_href_used: bool = False        # a <base href> affected resolution
+    conflict: bool = False              # several *different* signals
+    # This page's own indexability, from <meta name="robots"> AND the
+    # X-Robots-Tag response header - stored per page so the resolution pass
+    # can read a *target* page's noindex without any extra request.
+    page_noindex: bool = False
+
+    # --- Phase B: filled by the post-audit resolution pass, purely from the
+    # already-collected results map. None means "not applicable / not
+    # resolvable from what this audit actually fetched".
+    target_in_audit: bool | None = None
+    target_status: int | None = None
+    target_redirected: bool | None = None
+    target_final_url: str | None = None
+    target_noindex: bool | None = None
+    target_canonical: str | None = None
+    chain: list[str] = Field(default_factory=list)
+    cycle: bool = False
+
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 CheckFailureReason = Literal["network", "timeout", "content_type", "access_blocked"]
 
 
@@ -87,6 +131,7 @@ class PageResult(BaseModel):
     open_graph: OpenGraphData = Field(default_factory=OpenGraphData)
     meta: MetaData = Field(default_factory=MetaData)
     schema_data: SchemaData = Field(default_factory=SchemaData, serialization_alias="schema")
+    canonical: CanonicalData = Field(default_factory=CanonicalData)
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

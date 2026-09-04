@@ -538,6 +538,44 @@ img { max-width: 100%; }
 .status-warning .result-message { color: var(--warning); }
 .status-success .result-message { color: var(--success); }
 
+/* Canonical module: "страница → canonical → результат" in one main line.
+   Uses the theme CSS variables throughout so light/dark come for free. */
+.result-item-main.canonical-main {
+  grid-template-columns: 10px minmax(0, 1fr) 22px;
+}
+.canonical-flow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.canonical-flow .result-path { flex: 0 1 auto; }
+.canonical-arrow { color: var(--muted); flex: 0 0 auto; }
+.canonical-target {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 650 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+}
+.canonical-verdict {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.status-error .canonical-verdict { color: var(--error); }
+.status-warning .canonical-verdict { color: var(--warning); }
+.status-success .canonical-verdict { color: var(--success); }
+@media (max-width: 640px) {
+  .canonical-verdict { margin-left: 0; }
+}
+
 .result-chevron {
   justify-self: end;
   color: #94a3b8;

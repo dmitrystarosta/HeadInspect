@@ -20,6 +20,16 @@ class MetadataParser(HTMLParser):
         self.html_lang: str | None = None
         self.charset: str | None = None
 
+        # Every <link rel="canonical"> href, in document order, including
+        # empty ones ("" is kept so the analyzer can tell a present-but-empty
+        # href apart from no tag at all). rel may carry several space-
+        # separated tokens (rel="canonical alternate"); we match the token.
+        self.canonical_hrefs: list[str] = []
+        # First <base href> only (per the HTML spec the first in-tree base
+        # element with an href wins). None if absent/empty/broken - a bad or
+        # empty base must never affect existing OG/Meta/Schema parsing.
+        self.base_href: str | None = None
+
         self.in_json_ld = False
         self.current_json_ld_parts: list[str] = []
         self.json_ld_blocks: list[str] = []
@@ -41,6 +51,25 @@ class MetadataParser(HTMLParser):
 
         if tag == "html" and self.html_lang is None:
             self.html_lang = data.get("lang", "").strip() or None
+            return
+
+        if tag == "base":
+            # Only the first base with a non-empty href counts, and it must
+            # not disturb anything else. Wrapped defensively so a malformed
+            # base can never raise out of the parser.
+            if self.base_href is None:
+                href = data.get("href", "").strip()
+                if href:
+                    self.base_href = href
+            return
+
+        if tag == "link":
+            rel_tokens = data.get("rel", "").lower().split()
+            if "canonical" in rel_tokens:
+                # Keep the raw href verbatim (including empty) - resolution,
+                # validation and normalization all happen later in the
+                # canonical analyzer, never here.
+                self.canonical_hrefs.append(data.get("href", "").strip())
             return
 
         if tag == "title":

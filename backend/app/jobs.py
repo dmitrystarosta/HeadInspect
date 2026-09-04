@@ -12,6 +12,7 @@ import uuid
 from fastapi import HTTPException
 
 from .audit import ACCESS_BLOCKED_STATUS_CODES, discover_audit_urls, run_pages
+from .canonical_resolve import resolve_canonicals
 from .config import (
     AUDIT_TIMEOUT,
     DOMAIN_COOLDOWN_SECONDS,
@@ -395,6 +396,12 @@ class JobManager:
 
                     await run_pages(urls, on_result, stop_event=stop_event)
                     self._apply_meta_duplicate_warnings(job.results)
+                    # Cross-page canonical resolution: synchronous, in-memory,
+                    # never any network. Covers normal completion and the
+                    # blocked-mid-audit partial (run_pages returns normally in
+                    # both). The AUDIT_TIMEOUT partial path calls it separately
+                    # in the TimeoutError handler below, on whatever we have.
+                    resolve_canonicals(job.results)
 
                 await asyncio.wait_for(execute_audit(), timeout=AUDIT_TIMEOUT)
 
@@ -437,7 +444,10 @@ class JobManager:
                     if job.checked_urls > 0:
                         # We already have usable data for some pages - do not
                         # discard it. Report what we have as a partial result
-                        # instead of a bare failure.
+                        # instead of a bare failure. Resolve canonicals over
+                        # the pages we did collect (a target missing from this
+                        # partial map is simply "not checked", never an error).
+                        resolve_canonicals(job.results)
                         job.status = "completed_partial"
                         if job.blocked_mid_audit:
                             job.partial_reason = (

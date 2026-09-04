@@ -1,3 +1,117 @@
+# HeadInspect — запуск модуля Canonical и синхронизация CHANGELOG (04.09.2026)
+
+Дата выполнения: 4 сентября 2026.
+Версия приложения: **0.5.0** (была 0.4.0).
+
+Реализован пятый полноценный модуль HeadInspect — Canonical — по утверждённому
+проекту. Одновременно в журнал внесены ранее выполненные работы, которые были
+в коде, но отсутствовали в CHANGELOG. Датировка ранее выполненных работ взята
+из `docs/TODO.md` и имён файлов репозитория; там, где архив не подтверждает
+точную дату, она сознательно не указывается (Git-истории в архиве нет).
+
+## Новое: пятый модуль — Canonical
+
+Canonical встроен в существующий единый аудит: он не заводит отдельный краул и
+отдельный job, а вычисляется в том же обходе сайта, что Open Graph / Meta /
+Schema / Sitemap, и отдаётся тем же `/api/audits/{id}/results`.
+
+Backend:
+- `backend/app/urlnorm.py` (новый) — единая безопасная URL-эквивалентность
+  (scheme/host case-insensitive, дефолтные `:80`/`:443` схлопываются, path и
+  query сравниваются строго, fragment не участвует, www/non-www не
+  схлопываются). Используется для self-canonical, сравнения нескольких
+  сигналов, HTML↔HTTP Link и поиска цели в карте.
+- `backend/app/htmlmeta.py` — `MetadataParser` теперь читает все
+  `<link rel="canonical">` (включая пустой href) и первый `<base href>`
+  (осторожно: пустой/битый base не влияет на разбор OG/Meta/Schema).
+- `backend/app/analyzers/canonical.py` (новый) — фаза А (по HTML и заголовкам
+  ответа, без сети): наличие/отсутствие, self / другая страница / другой
+  домен, относительный (+ учёт `<base href>`) и абсолютный, пустой href,
+  некорректный URL, несколько одинаковых (warning) и разных (error) сигналов,
+  HTML+HTTP Link (совпадение → дублирование, конфликт → error), fragment,
+  query, схема http/https, вариант www/non-www, дефолтные порты, noindex по
+  `<meta name="robots">` и `X-Robots-Tag`.
+- `backend/app/canonical_resolve.py` (новый) — фаза Б (синхронный пост-проход
+  по уже собранным результатам, без сети): статус/redirect/noindex цели,
+  цепочки A→B→C и циклы A→B→A — только если целевая страница реально входит в
+  аудит; иначе «целевая страница не проверялась» (информационно, не ошибка).
+  Корректно работает при `completed_partial`.
+- `backend/app/models.py` — модель `CanonicalData`, встроена в `PageResult`.
+- `backend/app/audit.py` — вызов анализатора в `analyze_page`.
+- `backend/app/jobs.py` — вызов `resolve_canonicals` после `run_pages` и в
+  ветке `AUDIT_TIMEOUT` для частичного результата.
+
+Принципиально: **никаких дополнительных сетевых запросов ради Canonical не
+добавлено.** Данные о цели берутся только из страниц, уже загруженных обычным
+аудитом; сторонние домены не краулятся.
+
+Frontend:
+- `site/canonical/index.html` — заглушка заменена полноценным модулем уровня
+  Meta/Schema/OG/Sitemap (hero, форма, прогресс, результаты, сводка, фильтры,
+  контент, FAQ, тёмная/светлая тема, desktop/mobile).
+- `site/canonical.js` (новый) — логика модуля с основной строкой в формате
+  **«Страница → Canonical → результат»** и подробностями в раскрытии строки.
+- `site/home.js` + `site/index.html` — Canonical включён в общий аудит и
+  сводку главной; плитка активирована; метка «скоро» снята во всей навигации
+  (nav, cross-tools, tool-card) на всех страницах. Images остаётся «скоро».
+- `site/styles.css` — стили трёхчастной строки Canonical на CSS-переменных
+  (обе темы).
+
+Тесты: backend `tests/test_canonical.py`, `tests/test_canonical_resolve.py`,
+`tests/test_canonical_integration.py`; frontend
+`tests/frontend/canonical-map-api-row.test.mjs`,
+`canonical-resubmit-preserves-results.test.mjs`, плюс `canonical.js` добавлен в
+`pages-load.test.mjs`. Полный прогон: backend 163/163, frontend 63/63.
+
+## Синхронизация CHANGELOG: ранее выполненные работы
+
+### 31.08.2026 — P0-защита API (подтверждается docs/TODO.md)
+
+- **Domain cooldown**: минимальный интервал между полными аудитами одного
+  сайта (`DOMAIN_COOLDOWN_SECONDS = 600`); ключ — hostname из
+  `normalize_public_url()`; www/non-www раздельно; отсчёт с момента создания
+  job; ответ 429 + Retry-After. Файлы: `config.py`, `jobs.py`
+  (`create`, `_cooldown_site_key`). Тесты: `test_domain_cooldown.py`.
+- **Ограничение хранилища jobs** (`MAX_JOBS = 200`): вытеснение старейших
+  безопасно-завершённых; выверенная граница между `create()` (`>=`,
+  освобождает слот) и `cleanup()` (`>`), устранён off-by-one с ложным 503
+  «точно на пределе». Файлы: `config.py`, `jobs.py`. Тесты: `test_max_jobs.py`.
+
+### 30.08.2026, commit `4adfbe0` — корректность аудита (подтверждается docs/TODO.md)
+
+- **Семантика `PAGE_TIMEOUT`**: 30-секундный таймаут применяется после захвата
+  семафора `PAGE_CONCURRENCY`, а не вокруг ожидания очереди. Устранён ложный
+  вердикт «страница не ответила за 30 с» для страниц, простаивавших в очереди.
+  Файл: `audit.py`. Тесты: `test_page_timeout_semaphore.py`.
+- **Поддержка не-UTF-8 HTML**: `sniff_charset`/`decode_html` (charset из
+  HTTP-заголовка → `<meta charset>` → UTF-8, graceful-fallback). Проверено на
+  Windows-1251. Файл: `htmlmeta.py`. Тесты: `test_encoding.py`.
+
+### 29.08.2026 — диагностика и инфраструктура (подтверждается docs/TODO.md и docs/server/nginx-full-config-2026-08-29.txt)
+
+- **`check_reason`**: структурированная причина непройденной проверки
+  (`network`/`timeout`/`content_type`/`access_blocked`) вместо разбора текста
+  ошибки на фронтенде. Файлы: `models.py`, `audit.py`. Тесты:
+  `test_check_reason.py`. Есть отдельный
+  `IMPLEMENTATION_REPORT_2026-08-29_check_reason.md`.
+- **Production-конфигурация Nginx** сохранена в репозитории:
+  `docs/server/nginx-full-config-2026-08-29.txt`.
+
+### Дата по архиву не подтверждается — фронтенд-устойчивость
+
+Точная дата этих работ содержимым архива не подтверждается (нет ни в TODO, ни
+в CHANGELOG; mtime в архиве недостоверен), поэтому дата не указывается.
+
+- **Сохранение результатов при повторной отправке**: деструктивный сброс
+  состояния происходит только после успешного POST во всех пяти точках входа
+  (`app.js`, `home.js`, `meta.js`, `schema.js`, `sitemap.js`); отклонение
+  429/cooldown больше не стирает уже показанный отчёт. Тест:
+  `tests/frontend/resubmit-preserves-results.test.mjs`.
+- **Тёмная тема** через `@media (prefers-color-scheme: dark)` (`styles.css`) и
+  связанные косметические правки.
+
+---
+
 # HeadInspect — доработка по итогам аудита от 28.08.2026
 
 Дата выполнения: 28 августа 2026.

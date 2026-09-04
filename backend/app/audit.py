@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
+from .analyzers.canonical import analyze_canonical
 from .analyzers.meta import analyze_meta
 from .analyzers.open_graph import analyze_open_graph
 from .analyzers.schema import analyze_schema
@@ -185,6 +186,7 @@ async def _fetch_and_analyze(url: str) -> PageResult:
 
     meta_data = analyze_meta(parser)
     schema_data = analyze_schema(parser.json_ld_blocks, parser.microdata_types)
+    canonical_data = analyze_canonical(parser, result.headers, url, result.url)
 
     return PageResult(
         url=result.url,
@@ -195,6 +197,7 @@ async def _fetch_and_analyze(url: str) -> PageResult:
         open_graph=og_data,
         meta=meta_data,
         schema_data=schema_data,
+        canonical=canonical_data,
         errors=errors,
         warnings=warnings,
     )

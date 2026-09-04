@@ -85,6 +85,15 @@ function moduleTotals(pages, moduleName) {
     }, { errors: 0, warnings: 0 });
   }
 
+  if (moduleName === "canonical") {
+    return pages.reduce((totals, page) => {
+      const canonical = page.canonical || {};
+      totals.errors += Array.isArray(canonical.errors) ? canonical.errors.length : 0;
+      totals.warnings += Array.isArray(canonical.warnings) ? canonical.warnings.length : 0;
+      return totals;
+    }, { errors: 0, warnings: 0 });
+  }
+
   if (moduleName === "sitemap") {
     return pages.reduce((totals, page) => {
       const statusCode = page.status_code;
@@ -138,9 +147,11 @@ function renderAuditModule(moduleName, pages, status, jobId) {
     ? `Meta-теги проверены на ${successfullyChecked} страницах.`
     : moduleName === "schema"
       ? `Schema.org проверена на ${successfullyChecked} страницах.`
-      : moduleName === "sitemap"
-        ? `Sitemap проверен: ${successfullyChecked} URL.`
-        : `Open Graph проверен на ${successfullyChecked} страницах.`;
+      : moduleName === "canonical"
+        ? `Canonical проверен на ${successfullyChecked} страницах.`
+        : moduleName === "sitemap"
+          ? `Sitemap проверен: ${successfullyChecked} URL.`
+          : `Open Graph проверен на ${successfullyChecked} страницах.`;
 
   if (bodyText) {
     const unavailableText = failedChecks ? ` Не удалось проверить: ${failedChecks}. Эти страницы не считаются ошибками сайта.` : "";
@@ -154,17 +165,21 @@ function renderAuditModule(moduleName, pages, status, jobId) {
       ? "/meta/"
       : moduleName === "schema"
         ? "/schema/"
-        : moduleName === "sitemap"
-          ? "/sitemap/"
-          : "/open-graph/";
+        : moduleName === "canonical"
+          ? "/canonical/"
+          : moduleName === "sitemap"
+            ? "/sitemap/"
+            : "/open-graph/";
     link.href = `${basePath}?job=${encodeURIComponent(jobId)}&url=${encodeURIComponent(status.normalized_url)}`;
     link.textContent = moduleName === "meta"
       ? "Открыть подробный Meta-аудит"
       : moduleName === "schema"
         ? "Открыть подробный Schema-аудит"
-        : moduleName === "sitemap"
-          ? "Открыть подробный Sitemap-аудит"
-          : "Открыть подробный Open Graph-аудит";
+        : moduleName === "canonical"
+          ? "Открыть подробный Canonical-аудит"
+          : moduleName === "sitemap"
+            ? "Открыть подробный Sitemap-аудит"
+            : "Открыть подробный Open Graph-аудит";
   }
 }
 
@@ -198,6 +213,7 @@ function renderHomeResult(status, results, jobId) {
 
   renderAuditModule("open-graph", pages, status, jobId);
   renderAuditModule("meta", pages, status, jobId);
+  renderAuditModule("canonical", pages, status, jobId);
   renderAuditModule("schema", pages, status, jobId);
   renderAuditModule("sitemap", pages, status, jobId);
 
