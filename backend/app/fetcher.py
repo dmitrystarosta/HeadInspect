@@ -72,23 +72,18 @@ async def safe_fetch(
             if not original_host:
                 raise HTTPException(status_code=400, detail="Missing hostname")
 
-            # Resolve and validate the host, then pin the *exact* address we
-            # just validated for the real TCP connection below. If we instead
-            # let httpx/httpcore re-resolve the hostname a second time when
-            # opening the socket, a hostile authoritative DNS server with a
-            # short TTL could return a public IP for this check and a
-            # private/loopback/link-local/metadata address for the actual
-            # connection a moment later (DNS rebinding / TOCTOU). Connecting
-            # directly to the validated IP closes that gap: there is no
-            # second, unpinned DNS lookup for httpx to abuse.
+            # Resolve and validate ALL candidate addresses once. We then try
+            # them in turn, but ONLY the connection-establishment phase falls
+            # back from one address to the next (see the inner loop). Crucially
+            # we do NOT re-resolve between attempts: every address here was
+            # already validated by this single resolve call, so the DNS-pinning
+            # / DNS-rebinding (TOCTOU) guarantee is fully preserved - a hostile
+            # authoritative server gets no second, unpinned lookup to swap in a
+            # private/loopback/link-local/metadata address. Connecting directly
+            # to a pre-validated IP is what closes that gap.
             pinned_ips = await resolve_and_validate_host(current)
-            pinned_ip = pinned_ips[0]
 
             port = parts.port or (443 if parts.scheme == "https" else 80)
-            pinned_netloc = _format_host_for_netloc(pinned_ip)
-            if parts.port is not None:
-                pinned_netloc = f"{pinned_netloc}:{port}"
-            pinned_url = urlunsplit((parts.scheme, pinned_netloc, parts.path or "/", parts.query, ""))
 
             # The Host header keeps name-based virtual hosting working even
             # though we connect by IP. The "sni_hostname" extension keeps TLS
@@ -99,23 +94,55 @@ async def safe_fetch(
             if parts.scheme == "https":
                 extensions["sni_hostname"] = original_host
 
-            try:
-                request = client.build_request(
-                    "GET",
-                    pinned_url,
-                    headers=per_request_headers,
-                    extensions=extensions,
-                )
-            except httpx.InvalidURL as exc:
-                raise HTTPException(status_code=400, detail="Invalid URL") from exc
+            # Outcome of trying this hop's validated addresses.
+            fetch_result: FetchResult | None = None
+            redirect_to: str | None = None
+            last_connect_exc: Exception | None = None
 
-            try:
-                # Held for the full request lifecycle (connect through the
-                # response body being fully read/closed), not just until
-                # headers arrive - a slow body still occupies a connection
-                # against the audited site and must count against the cap.
+            for pinned_ip in pinned_ips:
+                pinned_netloc = _format_host_for_netloc(pinned_ip)
+                if parts.port is not None:
+                    pinned_netloc = f"{pinned_netloc}:{port}"
+                pinned_url = urlunsplit((parts.scheme, pinned_netloc, parts.path or "/", parts.query, ""))
+
+                try:
+                    request = client.build_request(
+                        "GET",
+                        pinned_url,
+                        headers=per_request_headers,
+                        extensions=extensions,
+                    )
+                except httpx.InvalidURL as exc:
+                    raise HTTPException(status_code=400, detail="Invalid URL") from exc
+
+                # The global cap is held for the full lifecycle of each attempt
+                # (connect through body read/close), released between attempts.
                 async with _global_fetch_semaphore:
-                    response = await client.send(request, stream=True)
+                    try:
+                        response = await client.send(request, stream=True)
+                    except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                        # Connection to THIS address could not be established.
+                        # Fall back to the next already-validated address:
+                        # anycast / multi-A-record hosts (e.g. GitHub Pages)
+                        # expose several equivalent IPs, and one transiently
+                        # unreachable edge must not fail the whole fetch. No
+                        # re-resolution happens - we only try IPs already
+                        # validated above.
+                        last_connect_exc = exc
+                        continue
+                    except httpx.TimeoutException as exc:
+                        # A non-connect timeout (e.g. waiting for response
+                        # headers on an established connection) is a real
+                        # failure of this attempt - surface it as before, do
+                        # NOT switch addresses.
+                        raise HTTPException(status_code=504, detail=f"Timeout while fetching {current}") from exc
+                    except httpx.RequestError as exc:
+                        raise HTTPException(status_code=502, detail=f"Cannot fetch {current}") from exc
+
+                    # Connection established: we are committed to this response
+                    # and never switch addresses from here on. Any read-phase
+                    # error (or HTTP status, including 4xx/5xx) is handled here,
+                    # never by trying another IP.
                     try:
                         status = response.status_code
 
@@ -129,8 +156,8 @@ async def safe_fetch(
                             # (real hostname), never to the pinned-IP URL we
                             # actually connected to - otherwise a relative
                             # Location header would get joined onto an IP literal.
-                            current = normalize_public_url(urljoin(current, location))
-                            continue
+                            redirect_to = normalize_public_url(urljoin(current, location))
+                            break
 
                         content_type = response.headers.get("content-type", "").lower()
                         if accepted_content_types and content_type:
@@ -160,17 +187,29 @@ async def safe_fetch(
                         # pinned-IP URL we actually connected to - callers
                         # (dedup, sitemap display, Meta/OG/Schema, etc.) must
                         # keep seeing the real hostname.
-                        return FetchResult(
+                        fetch_result = FetchResult(
                             url=current,
                             status_code=status,
                             headers=response.headers,
                             content=b"".join(chunks),
                         )
+                        break
+                    except httpx.TimeoutException as exc:
+                        raise HTTPException(status_code=504, detail=f"Timeout while fetching {current}") from exc
+                    except httpx.RequestError as exc:
+                        raise HTTPException(status_code=502, detail=f"Cannot fetch {current}") from exc
                     finally:
                         await response.aclose()
-            except httpx.TimeoutException as exc:
-                raise HTTPException(status_code=504, detail=f"Timeout while fetching {current}") from exc
-            except httpx.RequestError as exc:
-                raise HTTPException(status_code=502, detail=f"Cannot fetch {current}") from exc
+
+            if fetch_result is not None:
+                return fetch_result
+            if redirect_to is not None:
+                current = redirect_to
+                continue
+            # Every validated address failed to establish a connection. Surface
+            # the same error shape the single-address code produced before.
+            if isinstance(last_connect_exc, httpx.TimeoutException):
+                raise HTTPException(status_code=504, detail=f"Timeout while fetching {current}") from last_connect_exc
+            raise HTTPException(status_code=502, detail=f"Cannot fetch {current}") from last_connect_exc
 
     raise HTTPException(status_code=502, detail="Fetch failed")

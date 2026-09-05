@@ -269,16 +269,22 @@ function renderRows() {
   visibleRows.forEach(row => {
     const item = document.createElement("article");
     item.className = `result-item status-${row.status}`;
-    // Canonical's own main line: page path -> canonical target -> verdict.
+    // Canonical's main entry is always two lines with an identical structure
+    // across every card: line 1 is "page path ... verdict", line 2 is the
+    // (grey) canonical URL. The canonical URL goes on its own second line
+    // regardless of its length so all cards line up the same way.
     item.innerHTML = `
       <button class="result-item-main canonical-main" type="button" aria-expanded="false">
         <span class="result-dot" aria-hidden="true"></span>
         <span class="canonical-flow">
-          <span class="result-path">${escapeHtml(row.path)}</span>
-          <span class="canonical-arrow" aria-hidden="true">→</span>
-          <span class="canonical-target">${escapeHtml(row.canonicalDisplay)}</span>
-          <span class="canonical-arrow" aria-hidden="true">→</span>
-          <span class="canonical-verdict">${escapeHtml(row.verdict)}</span>
+          <span class="canonical-headline">
+            <span class="result-path">${escapeHtml(row.path)}</span>
+            <span class="canonical-verdict">${escapeHtml(row.verdict)}</span>
+          </span>
+          <span class="canonical-target-line">
+            <span class="canonical-arrow" aria-hidden="true">→</span>
+            <span class="canonical-target">${escapeHtml(row.canonicalDisplay)}</span>
+          </span>
         </span>
         <span class="result-chevron" aria-hidden="true">⌄</span>
       </button>

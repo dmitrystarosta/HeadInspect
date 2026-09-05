@@ -120,6 +120,7 @@ class Job:
     access_blocked_status: int | None = None
     blocked_mid_audit: bool = False
     mid_audit_block_status: int | None = None
+    sitemap_declared_unfetched: bool = False
     created_at: datetime = field(default_factory=utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -376,6 +377,7 @@ class JobManager:
                         job.robots_sitemap_urls = discovered["robots_sitemap_urls"]
                         job.sitemap_urls = discovered["sitemap_urls"]
                         job.sitemap_issues = discovered.get("sitemap_issues", [])
+                        job.sitemap_declared_unfetched = discovered.get("sitemap_declared_unfetched", False)
                         job.discovered_urls = len(urls)
                         job.limited = discovered["limited"]
                         job.access_blocked_status = access_blocked_status
@@ -414,6 +416,18 @@ class JobManager:
                             f"Показаны результаты {job.checked_urls} страниц, проверенных до начала "
                             "ограничения; остальные страницы не проверялись, чтобы не создавать лишнюю "
                             "нагрузку на сайт."
+                        )
+                    elif job.sitemap_declared_unfetched:
+                        # A sitemap was declared in robots.txt but could not be
+                        # fetched, so discovery fell back to auditing only the
+                        # entry page. The entry page itself audited fine, but the
+                        # site was NOT fully discovered - surface that via the
+                        # standard partial-completion notice (rendered on every
+                        # module by HI.renderPartialNotice).
+                        job.status = "completed_partial"
+                        job.partial_reason = (
+                            "Sitemap указан в robots.txt, но HeadInspect не смог его получить. "
+                            "Проверена только стартовая страница."
                         )
                     else:
                         job.status = "completed"

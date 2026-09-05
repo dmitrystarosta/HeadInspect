@@ -1,3 +1,33 @@
+# HeadInspect — устойчивость discovery, Canonical UI и Schema.org sameAs (04.09.2026)
+
+## Устойчивость discovery / Sitemap
+
+- `safe_fetch` при `ConnectTimeout`/`ConnectError` пробует остальные уже
+  валидированные IP (без нового DNS-resolve, только на фазе установления
+  соединения).
+- Sitemap, объявленный в robots.txt, но недоступный, теперь попадает в
+  `sitemap_issues`.
+- Такой случай больше не выглядит как успешный одностраничный аудит: итоговый
+  статус `completed_partial`, стартовая страница при этом проверяется.
+- На странице Sitemap показывается предупреждение и причина.
+- Добавлены тесты на fallback по IP, на запись недоступного объявленного sitemap
+  и на отличие этого случая от обычных одностраничных сайтов.
+
+## Canonical UI и документация
+
+- Серый canonical URL теперь всегда выводится отдельной второй строкой — единая
+  структура карточек независимо от длины URL.
+- README и TODO актуализированы: Canonical — рабочий пятый модуль (Open Graph,
+  Meta, Schema, Sitemap, Canonical); в планах остаётся Images.
+
+## Schema.org sameAs
+
+- В сущность `WebSite` (`https://headinspect.ru/#website`) добавлены официальные
+  сообщества: `https://vk.ru/headinspect` и `https://t.me/headinspect`.
+- Разметка обновлена на опубликованных страницах и покрыта тестом.
+
+---
+
 # HeadInspect — запуск модуля Canonical и синхронизация CHANGELOG (04.09.2026)
 
 Дата выполнения: 4 сентября 2026.

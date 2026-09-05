@@ -229,6 +229,7 @@ async def discover_audit_urls(raw_url: str) -> dict:
             "urls": [],
             "limited": False,
             "access_blocked_status": entry.status_code,
+            "sitemap_declared_unfetched": False,
         }
 
     robots_url, robots_found, robots_text = await fetch_robots(normalized)
@@ -251,6 +252,16 @@ async def discover_audit_urls(raw_url: str) -> dict:
         site_host=effective_host,
     )
 
+    # Discovery is "degraded" only in the specific case the user must be warned
+    # about: a sitemap was explicitly declared in robots.txt, it could not be
+    # fetched/parsed (so `sitemap_issues` is non-empty), and as a result no
+    # pages were discovered at all - discovery therefore falls back to auditing
+    # just the entry page below. This deliberately does NOT fire when there was
+    # no declared sitemap (small sites, guessed-default misses) or when a
+    # sitemap was fetched fine and simply contained a single page (in that case
+    # `urls` is non-empty here and there are no issues).
+    sitemap_declared_unfetched = bool(robots_sitemaps) and not urls and bool(sitemap_issues)
+
     if not urls:
         urls = [normalized]
 
@@ -264,6 +275,7 @@ async def discover_audit_urls(raw_url: str) -> dict:
         "urls": urls,
         "limited": limited,
         "access_blocked_status": None,
+        "sitemap_declared_unfetched": sitemap_declared_unfetched,
     }
 
 

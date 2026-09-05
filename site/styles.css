@@ -538,20 +538,38 @@ img { max-width: 100%; }
 .status-warning .result-message { color: var(--warning); }
 .status-success .result-message { color: var(--success); }
 
-/* Canonical module: "страница → canonical → результат" in one main line.
-   Uses the theme CSS variables throughout so light/dark come for free. */
+/* Canonical module: every card has the same two-line structure - line 1 is
+   "page path ... verdict", line 2 is the (grey) canonical URL. The URL is
+   always on its own second line regardless of length, so cards line up. */
 .result-item-main.canonical-main {
   grid-template-columns: 10px minmax(0, 1fr) 22px;
 }
 .canonical-flow {
   min-width: 0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   font-size: 12px;
 }
-.canonical-flow .result-path { flex: 0 1 auto; }
+.canonical-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.canonical-headline .result-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canonical-target-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
 .canonical-arrow { color: var(--muted); flex: 0 0 auto; }
 .canonical-target {
   min-width: 0;

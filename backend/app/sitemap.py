@@ -97,13 +97,20 @@ async def discover_urls(
     *,
     site_host: str | None = None,
 ) -> tuple[list[str], list[str], bool, list[str]]:
+    # A sitemap explicitly declared in robots.txt is "known": if we can't
+    # fetch/parse it, that is a real, reportable problem. The guessed default
+    # locations (/sitemap.xml, /sitemap_index.xml), used only when robots.txt
+    # declared none, are NOT known: a miss there is the common, expected case
+    # and stays silent. Known-ness propagates to the children of a known
+    # sitemapindex.
+    declared = bool(initial_sitemaps)
     if not initial_sitemaps:
         initial_sitemaps = [
             urljoin(site_url, "/sitemap.xml"),
             urljoin(site_url, "/sitemap_index.xml"),
         ]
 
-    queue = deque((url, 0) for url in initial_sitemaps)
+    queue = deque((url, 0, declared) for url in initial_sitemaps)
     seen_sitemaps: set[str] = set()
     processed_sitemaps: list[str] = []
     pages: list[str] = []
@@ -115,15 +122,19 @@ async def discover_urls(
         site_host = urlsplit(site_url).hostname
 
     while queue and len(seen_sitemaps) < MAX_SITEMAPS:
-        sitemap_url, depth = queue.popleft()
+        sitemap_url, depth, known = queue.popleft()
         if depth > MAX_SITEMAP_DEPTH:
             continue
 
+        raw_sitemap_url = sitemap_url
         try:
             sitemap_url = await validate_public_url(sitemap_url)
         except HTTPException:
-            # Not a valid/allowed URL at all - nothing was ever fetched, so
-            # there is nothing meaningful to report to the user.
+            # Not a valid/allowed URL at all - nothing was ever fetched. For a
+            # guessed default this is silent; for a sitemap declared in
+            # robots.txt it is a reportable problem.
+            if known:
+                issues.append(f"{raw_sitemap_url}: некорректный или недопустимый адрес sitemap из robots.txt")
             continue
 
         if sitemap_url in seen_sitemaps:
@@ -136,14 +147,22 @@ async def discover_urls(
                 max_bytes=MAX_SITEMAP_BYTES,
                 accepted_content_types=("xml", "text/plain", "application/octet-stream", "gzip"),
             )
-        except HTTPException:
+        except HTTPException as exc:
             # A sitemap candidate that couldn't even be fetched (404, DNS
-            # error, timeout, etc.) is an extremely common, expected outcome
-            # for the guessed default locations - reporting every miss would
-            # be noise, not signal.
+            # error, timeout, connection error, etc.). For the *guessed*
+            # default locations this is an extremely common, expected outcome -
+            # reporting every miss would be noise, not signal - so it stays
+            # silent. But a sitemap explicitly *declared in robots.txt* that we
+            # could not retrieve is exactly the case that previously turned a
+            # transient network failure into a silent "site has one page":
+            # record it so discovery does not look successful.
+            if known:
+                issues.append(f"{sitemap_url}: не удалось получить sitemap ({exc.detail})")
             continue
 
         if result.status_code != 200:
+            if known:
+                issues.append(f"{sitemap_url}: sitemap недоступен (HTTP {result.status_code})")
             continue
 
         try:
@@ -162,7 +181,10 @@ async def discover_urls(
             for child in locs:
                 if len(seen_sitemaps) + len(queue) >= MAX_SITEMAPS:
                     break
-                queue.append((child, depth + 1))
+                # A child of a known (robots-declared) index is itself known:
+                # if it can't be fetched, that is still a real gap in the
+                # declared discovery mechanism, not a guessed-default miss.
+                queue.append((child, depth + 1, known))
             continue
 
         for page_url in locs:

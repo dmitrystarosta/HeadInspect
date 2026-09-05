@@ -114,7 +114,22 @@ function mapApiRow(page) {
   };
 }
 
-function missingSitemapRow() {
+function missingSitemapRow(status) {
+  const declared = Array.isArray(status?.robots_sitemap_urls) ? status.robots_sitemap_urls : [];
+  if (status?.robots_found && declared.length) {
+    // Declared in robots.txt but not retrievable/parseable: this is NOT the
+    // same as "no sitemap exists". It is a warning (the declared discovery
+    // mechanism failed), and the audit fell back to the entry page only.
+    return {
+      status: "warning",
+      path: declared[0] || "/sitemap.xml",
+      pageUrl: declared[0] || null,
+      message: "Sitemap объявлен, но не получен",
+      issueTitle: "Карта сайта объявлена в robots.txt, но недоступна",
+      issueText: "Sitemap указан в robots.txt, но HeadInspect не смог его получить или разобрать. Проверена только доступная стартовая страница сайта — список её URL неполон.",
+      details: { originalUrl: declared[0] || "—", finalUrl: "—", statusCode: "—", redirected: false }
+    };
+  }
   return {
     status: "error",
     path: "/sitemap.xml",
@@ -160,7 +175,7 @@ async function finishAudit(jobId, signal, { trackNormalizedUrl = false } = {}) {
 
   const data = await apiFetch(`/api/audits/${jobId}/results`, { signal });
   currentRows = (data.results || []).map(mapApiRow);
-  if (!currentAuditStatus?.sitemap_urls?.length) currentRows.unshift(missingSitemapRow());
+  if (!currentAuditStatus?.sitemap_urls?.length) currentRows.unshift(missingSitemapRow(currentAuditStatus));
   currentRows = sortRowsForDisplay(currentRows);
   showResults(currentRows.length, status);
 }
@@ -244,13 +259,21 @@ function updateRobotsResult(status) {
   box.classList.remove("ok", "warn", "error");
   url.textContent = status.robots_url || "";
 
-  if (status.robots_found && declared.length) {
+  if (status.robots_found && declared.length && found.length) {
     box.classList.add("ok");
     icon.textContent = "✓";
     title.textContent = "robots.txt найден";
     text.textContent = declared.length === 1
       ? "Sitemap указан в robots.txt."
       : `В robots.txt указано карт сайта: ${declared.length}.`;
+  } else if (status.robots_found && declared.length && !found.length) {
+    // Declared in robots.txt but HeadInspect could not retrieve/parse it.
+    // Previously this still showed the green "ok" box, hiding a real failure
+    // behind an apparently healthy result. It is a warning.
+    box.classList.add("warn");
+    icon.textContent = "!";
+    title.textContent = "Sitemap объявлен в robots.txt, но получить его не удалось";
+    text.textContent = "HeadInspect не смог загрузить карту сайта, указанную в robots.txt. Проверена только доступная стартовая страница — подробности ниже.";
   } else if (status.robots_found && found.length) {
     box.classList.add("warn");
     icon.textContent = "!";
@@ -275,9 +298,11 @@ function updateRobotsResult(status) {
   }
 }
 
-// Item 5: a sitemap candidate answered (HTTP 200) but HeadInspect could not
-// parse it - corrupted gzip, invalid XML, etc. This must be visible, not a
-// silent fallback to "just the entry page was audited".
+// A declared sitemap that HeadInspect could not use: either it answered
+// HTTP 200 but couldn't be parsed (corrupted gzip, invalid XML, ...), or -
+// since the discovery-instability fix - a sitemap declared in robots.txt
+// that couldn't be fetched at all (timeout, connect error, 404). Either way
+// this must be visible, not a silent fallback to "just the entry page".
 function renderSitemapIssues(status) {
   // Same staleness hazard as HI.renderPartialNotice: always clear a
   // previous job's leftover banner from this reused resultsCard first,
@@ -288,7 +313,7 @@ function renderSitemapIssues(status) {
   if (!issues.length) return;
   const box = document.createElement("div");
   box.className = "issue-box unavailable hi-sitemap-issues";
-  box.innerHTML = `<strong>Sitemap найден, но не полностью разобран</strong><ul>${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`;
+  box.innerHTML = `<strong>Проблемы с картой сайта</strong><ul>${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`;
   resultsCard.prepend(box);
 }
 
