@@ -109,13 +109,13 @@ function mapApiRow(page) {
 }
 
 function verdictText(status, c) {
-  if (!c.present) return "⚠ Canonical не указан";
-  if (status === "error") return "✕ Проблема canonical";
-  if (status === "warning") return "⚠ Есть замечание";
-  if (c.is_self) return "✓ Canonical корректен";
-  if (c.cross_domain) return "✓ Canonical на другой домен";
-  if (c.same_site) return "✓ Canonical на другую страницу";
-  return "✓ Canonical корректен";
+  if (!c.present) return "Canonical не указан";
+  if (status === "error") return "Проблема canonical";
+  if (status === "warning") return "Есть замечание";
+  if (c.is_self) return "Canonical корректен";
+  if (c.cross_domain) return "Canonical на другой домен";
+  if (c.same_site) return "Canonical на другую страницу";
+  return "Canonical корректен";
 }
 
 async function finishAudit(jobId, signal, { trackNormalizedUrl = false } = {}) {
