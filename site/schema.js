@@ -70,9 +70,70 @@ function mapApiRow(page) {
       nodeCount: schema.node_count || 0,
       types: Array.isArray(schema.types) ? schema.types : [],
       microdataCount: schema.microdata_count || 0,
-      microdataTypes: Array.isArray(schema.microdata_types) ? schema.microdata_types : []
+      microdataTypes: Array.isArray(schema.microdata_types) ? schema.microdata_types : [],
+      objects: Array.isArray(schema.objects) ? schema.objects : [],
+      objectsTruncated: !!schema.objects_truncated
     }
   };
+}
+
+// Render the contents of the Schema.org objects the backend found on a page.
+// Pure (string in -> HTML string out) so it can be unit-tested directly, and
+// EVERY dynamic fragment (type, key, scalar value) goes through escapeHtml -
+// all Schema values come from the audited (untrusted) site and must never be
+// treated as trusted HTML. Nested objects/arrays are handled recursively; no
+// new icons/emoji/checkmarks are introduced.
+function renderSchemaValue(value) {
+  if (Array.isArray(value)) {
+    if (!value.length) return "<code>—</code>";
+    const hasObject = value.some(v => v && typeof v === "object");
+    if (!hasObject) {
+      return `<code>${value.map(v => escapeHtml(v)).join(" · ")}</code>`;
+    }
+    return `<div class="schema-array">${
+      value.map(v => `<div class="schema-array-item">${renderSchemaValue(v)}</div>`).join("")
+    }</div>`;
+  }
+  if (value && typeof value === "object" && Array.isArray(value.properties)) {
+    return renderSchemaNested(value);
+  }
+  if (value === null || value === undefined || value === "") return "<code>—</code>";
+  return `<code>${escapeHtml(value)}</code>`;
+}
+
+function renderSchemaProps(properties) {
+  return (properties || []).map(p => `
+    <div class="meta-item">
+      <span>${escapeHtml(p.key)}</span>
+      <div class="meta-value">${renderSchemaValue(p.value)}${
+        p.truncated ? ` <small class="length-hint warn">сокращено</small>` : ""
+      }</div>
+    </div>`).join("");
+}
+
+function renderSchemaNested(obj) {
+  const head = obj.type ? `<div class="schema-nested-type">${escapeHtml(obj.type)}</div>` : "";
+  return `<div class="schema-nested">${head}<div class="meta-list">${renderSchemaProps(obj.properties)}</div></div>`;
+}
+
+function renderSchemaObjectsHtml(objects, objectsTruncated) {
+  if (!Array.isArray(objects) || !objects.length) return "";
+  const blocks = objects.map(obj => {
+    const typeLabel = obj.type || "(без @type)";
+    const body = `<div class="meta-list">${renderSchemaProps(obj.properties)}</div>${
+      obj.truncated ? `<div class="schema-object-note"><small class="length-hint warn">Часть свойств объекта сокращена</small></div>` : ""
+    }`;
+    // Big objects fold away so a complex page never becomes a wall of text;
+    // uses the same native <details> disclosure already used by the FAQ.
+    if ((obj.properties || []).length > 6) {
+      return `<details class="schema-object"><summary class="schema-object-type">${escapeHtml(typeLabel)}</summary>${body}</details>`;
+    }
+    return `<div class="schema-object"><div class="schema-object-type">${escapeHtml(typeLabel)}</div>${body}</div>`;
+  }).join("");
+  const note = objectsTruncated
+    ? `<div class="schema-object-note"><small class="length-hint warn">Показаны не все объекты страницы: часть данных сокращена.</small></div>`
+    : "";
+  return `<div class="schema-objects-title">Найденные объекты</div>${blocks}${note}`;
 }
 
 async function finishAudit(jobId, signal, { trackNormalizedUrl = false } = {}) {
@@ -266,6 +327,8 @@ function toggleDetail(item, detailHost, row, button) {
   if (row.status === "unavailable") {
     const list = $(".meta-list", tpl);
     if (list) list.hidden = true;
+    const objs = $(".schema-objects", tpl);
+    if (objs) objs.hidden = true;
     const preview = $(".preview-image", tpl);
     if (preview) preview.hidden = true;
     const issueBox = $(".issue-box", tpl);
@@ -295,6 +358,10 @@ function toggleDetail(item, detailHost, row, button) {
   $(".meta-list", tpl).innerHTML = entries.map(([key, value]) => `
     <div class="meta-item"><span>${escapeHtml(key)}</span><div class="meta-value"><code>${escapeHtml(value)}</code></div></div>
   `).join("");
+  const objectsHost = $(".schema-objects", tpl);
+  if (objectsHost) {
+    objectsHost.innerHTML = renderSchemaObjectsHtml(row.details.objects, row.details.objectsTruncated);
+  }
   $(".issue-box", tpl).innerHTML = `<strong>${escapeHtml(row.issueTitle)}</strong>${escapeHtml(row.issueText)}`;
   $(".detail-actions", tpl).innerHTML = `<a href="${escapeAttr(row.pageUrl)}" target="_blank" rel="noopener noreferrer">Открыть страницу ↗</a>`;
   detailHost.innerHTML = "";

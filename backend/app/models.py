@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -47,6 +47,32 @@ class MetaData(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class SchemaProperty(BaseModel):
+    # One "field -> value" line of a Schema.org object. `value` is a bounded,
+    # JSON-safe normalized value produced by the schema analyzer:
+    #   - a string / number / bool (a scalar);
+    #   - a list of such normalized values (e.g. sameAs);
+    #   - a nested object as a plain dict {"type": str, "properties": [ {"key",
+    #     "value"} ... ]} (same shape as SchemaObject minus the flags), so the
+    #     frontend can render nested data (author: Person, breadcrumb items,
+    #     ...) recursively without ever receiving the raw, untrusted JSON-LD.
+    # `truncated` marks that this value itself was shortened (long string, long
+    # array, or too-deep nesting) so the UI can say so honestly.
+    key: str
+    value: Any = None
+    truncated: bool = False
+
+
+class SchemaObject(BaseModel):
+    # A single top-level Schema.org entity (a node that actually has an
+    # @type - the @graph wrapper and technical nested structures are not
+    # promoted here; see analyzers/schema.py). Human-readable, already
+    # size-limited, safe to serialize for up to 500 pages.
+    type: str = ""
+    properties: list[SchemaProperty] = Field(default_factory=list)
+    truncated: bool = False  # some of this object's properties were omitted
+
+
 class SchemaData(BaseModel):
     json_ld_count: int = 0
     valid_json_ld_count: int = 0
@@ -55,6 +81,14 @@ class SchemaData(BaseModel):
     types: list[str] = Field(default_factory=list)
     microdata_count: int = 0
     microdata_types: list[str] = Field(default_factory=list)
+    # The actual contents of the JSON-LD objects found on the page, normalized
+    # and bounded (see analyzers/schema.py and config.py SCHEMA_MAX_* limits).
+    # Additive: none of the counters above change, and an empty list simply
+    # means "no Schema.org objects with an @type were found".
+    objects: list[SchemaObject] = Field(default_factory=list)
+    # True when whole objects (beyond SCHEMA_MAX_OBJECTS_PER_PAGE) or the
+    # per-page size budget forced some data on this page to be dropped.
+    objects_truncated: bool = False
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

@@ -59,6 +59,32 @@ MAX_OG_IMAGE_BYTES = 6 * 1024 * 1024
 MAX_SITEMAP_DEPTH = 4
 MAX_SITEMAPS = 50
 
+# --- Limits for extracting the *contents* of Schema.org (JSON-LD) objects.
+# These bound how much per-page Schema data the backend stores in a job and
+# returns in /results, so a page with pathologically large structured data
+# cannot blow up memory or the response for an audit of up to MAX_AUDIT_URLS
+# (500) pages. They are intentionally generous: ordinary, correct Schema.org
+# markup fits well within them and is never truncated - the limits only bite
+# on genuinely unusual pages, and when they do the UI says so honestly rather
+# than silently cutting data.
+#
+# SCHEMA_MAX_VALUE_CHARS is 1000 (not a few hundred): real `description`,
+# `articleBody` excerpts and similar legitimate fields routinely exceed a few
+# hundred characters, and clipping them would make normal, valid Schema look
+# broken. 1000 keeps whole descriptions intact while still capping a single
+# runaway string. The per-page byte budget below is the real backstop against
+# a page that stacks many such values.
+SCHEMA_MAX_OBJECTS_PER_PAGE = 25
+SCHEMA_MAX_PROPS_PER_OBJECT = 40
+SCHEMA_MAX_VALUE_CHARS = 1000
+SCHEMA_MAX_ARRAY_ITEMS = 20
+SCHEMA_MAX_DEPTH = 4
+# Total budget (in characters, a close and cheap proxy for bytes) for all
+# normalized object data of a single page. ~24 KB comfortably holds several
+# rich entities with full descriptions; worst case is ~24 KB x 500 pages =
+# ~12 MB per job, a ceiling that realistic sites never approach.
+SCHEMA_MAX_CHARS_PER_PAGE = 24 * 1024
+
 # Conservative OG-image guidance for warnings.
 RECOMMENDED_OG_WIDTH = 1200
 RECOMMENDED_OG_HEIGHT = 630

@@ -670,6 +670,53 @@ img { max-width: 100%; }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
 .detail-actions a { color: var(--accent); font-weight: 800; font-size: 13px; }
 
+/* "Найденные объекты" - contents of the page's Schema.org (JSON-LD) objects,
+   shown under the existing counters. Reuses the same meta-list/meta-value
+   look so it reads as part of the same card, with no new icons/decoration. */
+.schema-objects { display: grid; gap: 12px; margin-top: 16px; }
+.schema-objects:empty { display: none; margin-top: 0; }
+.schema-objects-title {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.schema-object {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+}
+.schema-object-type {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+details.schema-object > summary.schema-object-type {
+  cursor: pointer;
+  margin-bottom: 0;
+  list-style-position: inside;
+}
+details.schema-object[open] > summary.schema-object-type { margin-bottom: 8px; }
+.schema-nested {
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+.schema-nested-type {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+.schema-array { display: grid; gap: 4px; }
+.schema-array-item { min-width: 0; }
+.schema-object-note { margin-top: 6px; }
+
 .preview-box {
   border: 1px solid var(--line);
   border-radius: 14px;
