@@ -130,12 +130,22 @@ test("renderSchemaObjectsHtml: object-level and page-level truncation are surfac
   assert.match(html, /Показаны не все объекты/);
 });
 
-test("renderSchemaObjectsHtml: a large object (>6 props) folds into a <details> block", () => {
+test("renderSchemaObjectsHtml: every object folds into a <details> block regardless of property count", () => {
   const { renderSchemaObjectsHtml } = loadSchemaModule();
-  const properties = Array.from({ length: 9 }, (_, i) => ({ key: `p${i}`, value: `v${i}` }));
-  const html = renderSchemaObjectsHtml([{ type: "LocalBusiness", properties }], false);
-  assert.match(html, /<details class="schema-object"/);
-  assert.match(html, /<summary/);
+  const small = { type: "WebSite", properties: [
+    { key: "name", value: "A" },
+    { key: "url", value: "https://a/" },
+  ] };
+  const large = { type: "LocalBusiness", properties:
+    Array.from({ length: 9 }, (_, i) => ({ key: `p${i}`, value: `v${i}` })) };
+  const html = renderSchemaObjectsHtml([small, large], false);
+  // Both objects render as collapsed <details> with a <summary> heading; there
+  // is no open-by-default plain block anymore.
+  const detailsCount = (html.match(/<details class="schema-object"/g) || []).length;
+  assert.equal(detailsCount, 2);
+  assert.doesNotMatch(html, /<div class="schema-object">/);
+  // Native <details> is closed by default (no `open` attribute emitted).
+  assert.doesNotMatch(html, /<details[^>]*\sopen/);
 });
 
 test("renderSchemaObjectsHtml: no objects yields an empty string (section stays hidden)", () => {

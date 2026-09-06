@@ -123,12 +123,11 @@ function renderSchemaObjectsHtml(objects, objectsTruncated) {
     const body = `<div class="meta-list">${renderSchemaProps(obj.properties)}</div>${
       obj.truncated ? `<div class="schema-object-note"><small class="length-hint warn">Часть свойств объекта сокращена</small></div>` : ""
     }`;
-    // Big objects fold away so a complex page never becomes a wall of text;
-    // uses the same native <details> disclosure already used by the FAQ.
-    if ((obj.properties || []).length > 6) {
-      return `<details class="schema-object"><summary class="schema-object-type">${escapeHtml(typeLabel)}</summary>${body}</details>`;
-    }
-    return `<div class="schema-object"><div class="schema-object-type">${escapeHtml(typeLabel)}</div>${body}</div>`;
+    // Every object folds away by default (regardless of property count) so a
+    // complex page never becomes a wall of text; uses the same native
+    // <details> disclosure already used by the FAQ. Independent open state per
+    // object - not an accordion.
+    return `<details class="schema-object"><summary class="schema-object-type">${escapeHtml(typeLabel)}</summary>${body}</details>`;
   }).join("");
   const note = objectsTruncated
     ? `<div class="schema-object-note"><small class="length-hint warn">Показаны не все объекты страницы: часть данных сокращена.</small></div>`
