@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 from .config import MAX_AUDIT_URLS, MAX_SITEMAP_BYTES, MAX_SITEMAP_DEPTH, MAX_SITEMAPS
 from .fetcher import safe_fetch
-from .security import validate_public_url
+from .security import normalize_public_url, validate_public_url
 
 
 GZIP_MAGIC = b"\x1f\x8b"
@@ -188,8 +188,20 @@ async def discover_urls(
             continue
 
         for page_url in locs:
+            # Syntactic normalization only - deliberately NOT validate_public_url:
+            # discovery must not DNS-resolve every one of up to MAX_AUDIT_URLS
+            # sitemap entries (a per-URL resolve here is sequential, redundant,
+            # and its result is discarded). normalize_public_url still enforces
+            # scheme, hostname presence, credential/blocked-hostname rejection
+            # and port - everything the host filter and dedup below rely on.
+            # Connect-time SSRF protection is unchanged and remains authoritative
+            # in safe_fetch, which resolves, validates the IP and connects only
+            # to the pinned address just before each real request. A page that
+            # only resolves to a forbidden/unresolvable address is therefore no
+            # longer dropped here; it is fetched later and safe_fetch rejects it,
+            # surfacing as an ordinary check_failed page rather than a silent drop.
             try:
-                normalized = await validate_public_url(page_url)
+                normalized = normalize_public_url(page_url)
             except HTTPException:
                 continue
 
