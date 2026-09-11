@@ -317,16 +317,12 @@ function toggleDetail(item, detailHost, row, button) {
   const langHint = metaHint(row.details.lang, "lang");
   const charsetHint = metaHint(row.details.charset, "charset");
 
-  const countHint = (count, label) => count > 1
-    ? { text: `${count} ${label} — проверьте дубли в HTML`, state: "warn" }
-    : null;
-
   const entries = [
-    { key: "<title>", value: row.details.title, hint: countHint(row.details.titleCount, "тега") || titleHint },
-    { key: "description", value: row.details.description, hint: countHint(row.details.descriptionCount, "тега") || descriptionHint },
-    { key: "keywords", value: row.details.keywords, hint: countHint(row.details.keywordsCount, "тега") || keywordsHint },
-    { key: "robots", value: row.details.robots, hint: countHint(row.details.robotsCount, "тега") || robotsHint },
-    { key: "viewport", value: row.details.viewport, hint: countHint(row.details.viewportCount, "тега") || viewportHint },
+    { key: "<title>", value: row.details.title, hint: duplicateHint(row.details.titleCount) || titleHint },
+    { key: "description", value: row.details.description, hint: duplicateHint(row.details.descriptionCount) || descriptionHint },
+    { key: "keywords", value: row.details.keywords, hint: duplicateHint(row.details.keywordsCount) || keywordsHint },
+    { key: "robots", value: row.details.robots, hint: duplicateHint(row.details.robotsCount) || robotsHint },
+    { key: "viewport", value: row.details.viewport, hint: duplicateHint(row.details.viewportCount) || viewportHint },
     { key: "lang", value: row.details.lang, hint: langHint },
     { key: "charset", value: row.details.charset, hint: charsetHint }
   ];
@@ -355,6 +351,14 @@ function toggleDetail(item, detailHost, row, button) {
   button.setAttribute("aria-expanded", "true");
 }
 
+
+function duplicateHint(count) {
+  if (count <= 1) return null;
+  return {
+    text: `${count} ${pluralRu(count, "тег", "тега", "тегов")} — проверьте дубли в HTML`,
+    state: "warn"
+  };
+}
 
 function lengthHint(value, min, max, label) {
   if (!value || value === "—") {
