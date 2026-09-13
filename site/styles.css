@@ -418,6 +418,16 @@ img { max-width: 100%; }
   border-color: #bfdbfe;
 }
 
+/* Neutral reassurance shown only while an audit is in progress: the whole
+   #home-progress-card is hidden on completion, so this hides with it. Uses the
+   muted token, so it follows the dark theme automatically. */
+.progress-hint {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .results-head { align-items: center; }
 .results-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
