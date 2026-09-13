@@ -34,6 +34,17 @@ function setProgress(percent) {
 }
 
 function updateProgress(status) {
+  // A job that has been created but has not yet acquired the single execution
+  // slot is polled as status "queued" (see backend Job default status, set to
+  // "discovering" only after the audit_slots semaphore is acquired). Show an
+  // explicit "waiting in queue" state instead of the normal "Проверяем …"
+  // heading + steps, so a queued audit is never mistaken for a frozen one. As
+  // soon as the slot is acquired the status changes and we drop straight back
+  // into the normal in-progress rendering below.
+  const isQueued = status.status === "queued";
+  progressCard.classList.toggle("is-queued", isQueued);
+  if (isQueued) return;
+
   const discovered = status.discovered_urls || 0;
   const checked = status.checked_urls || 0;
 

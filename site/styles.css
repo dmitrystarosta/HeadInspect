@@ -428,6 +428,21 @@ img { max-width: 100%; }
   line-height: 1.5;
 }
 
+/* Queue-waiting state: shown only while the job has not yet acquired the single
+   execution slot (status === "queued"). home.js toggles .is-queued on the card;
+   this swaps the normal heading/track/steps/minutes-hint for a short notice.
+   Uses the same tokens/type scale as the normal heading, so it matches the
+   progress-card style on desktop, mobile and in the dark theme. */
+.progress-queued { display: none; }
+.progress-queued h2 { font-size: clamp(30px, 4vw, 42px); }
+.progress-queued p { margin: 8px 0 0; color: var(--muted); }
+
+.progress-card.is-queued .progress-heading,
+.progress-card.is-queued .progress-track,
+.progress-card.is-queued .progress-steps,
+.progress-card.is-queued .progress-hint { display: none; }
+.progress-card.is-queued .progress-queued { display: block; }
+
 .results-head { align-items: center; }
 .results-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
