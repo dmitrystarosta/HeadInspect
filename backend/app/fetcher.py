@@ -32,11 +32,15 @@ def _timeout() -> httpx.Timeout:
 # A single process-wide cap on the number of HTTP requests to third-party
 # sites that may be in flight at the same time, regardless of how many audit
 # jobs are currently running or what PAGE_CONCURRENCY is set to for a single
-# job. Today MAX_CONCURRENT_AUDITS is 1, so this has no observable effect
-# (PAGE_CONCURRENCY already caps a single job at the same number). It exists
-# so that raising MAX_CONCURRENT_AUDITS in the future cannot silently turn
-# the service into a source of unbounded concurrent traffic against audited
-# sites: every outbound request, from every job, funnels through here.
+# job. This is the PRIMARY resource limit for the service: every outbound
+# request, from every job (discovery and page crawl alike), funnels through
+# here, so total outbound concurrency - and hence peak sockets, response
+# buffers and parse CPU - is bounded by GLOBAL_MAX_CONCURRENT_FETCHES no matter
+# how many audits run concurrently or how many pages each one has. A single
+# audit is separately capped at PAGE_CONCURRENCY (its worker-pool size), so it
+# can never hold more than that many of these permits at once - which is what
+# stops one big audit from monopolising the pool and lets several audits share
+# it fairly.
 _global_fetch_semaphore = asyncio.Semaphore(GLOBAL_MAX_CONCURRENT_FETCHES)
 
 

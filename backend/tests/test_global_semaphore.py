@@ -71,8 +71,18 @@ async def test_global_semaphore_caps_real_concurrency_across_many_callers(monkey
     assert tracker["max_seen"] == 4, "the test should actually exercise the cap, not run serially"
 
 
-def test_global_max_concurrent_fetches_equals_page_concurrency_today():
-    """Today MAX_CONCURRENT_AUDITS == 1, so the global cap must equal
-    PAGE_CONCURRENCY for the change to be a true no-op in production - a
-    regression here would silently change current throughput/behavior."""
-    assert config.GLOBAL_MAX_CONCURRENT_FETCHES == config.PAGE_CONCURRENCY
+def test_concurrency_model_invariants():
+    """The global fetch pool is the PRIMARY resource cap, deliberately decoupled
+    from (and larger than) the per-audit page cap, so several audits can progress
+    at once - while a single audit, bounded by PAGE_CONCURRENCY, can still never
+    hold more than that many of the pool's permits."""
+    # Decoupled and larger than the per-audit cap (was equal in the old
+    # single-audit model).
+    assert config.GLOBAL_MAX_CONCURRENT_FETCHES > config.PAGE_CONCURRENCY
+    # Room for at least two audits at full per-audit concurrency at once.
+    assert config.GLOBAL_MAX_CONCURRENT_FETCHES >= 2 * config.PAGE_CONCURRENCY
+    # The active-audit cap is deliberately NOT the bottleneck: it sits at or
+    # above the shared fetch pool, so accepted audits share those 12 slots and
+    # progress concurrently instead of queueing early. The whole-audit queue is
+    # only an overload valve, not a per-user gate.
+    assert config.MAX_CONCURRENT_AUDITS >= config.GLOBAL_MAX_CONCURRENT_FETCHES

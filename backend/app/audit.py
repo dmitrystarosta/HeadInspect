@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import deque
 from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
@@ -285,17 +286,39 @@ async def run_pages(
     *,
     stop_event: asyncio.Event | None = None,
 ) -> None:
+    # Bounded worker pool instead of one task per URL. Previously this created
+    # len(urls) worker coroutines up front (up to MAX_AUDIT_URLS = 500) all
+    # parked on the semaphore; that both risked hundreds of live tasks per audit
+    # and, once several audits run at once, let a big audit fan out far more work
+    # than a small one. Here EXACTLY PAGE_CONCURRENCY workers pull URLs from a
+    # shared queue, so an audit holds at most PAGE_CONCURRENCY tasks and issues
+    # at most PAGE_CONCURRENCY concurrent requests - the structural per-audit cap
+    # that keeps one audit from grabbing a disproportionate share of the global
+    # fetch pool (fetcher._global_fetch_semaphore), which is the real limit on
+    # total outbound concurrency across all audits.
     semaphore = asyncio.Semaphore(PAGE_CONCURRENCY)
+    pending = deque(urls)
 
-    async def worker(url: str) -> None:
-        # analyze_page now owns the stop_event checks (before and after
-        # acquiring the semaphore) and the PAGE_TIMEOUT wrapping (applied
-        # only to the real fetch-and-analyze work, not to queueing) - see
-        # its docstring/comments. worker() is intentionally just dispatch:
-        # None means "never attempted, don't count it anywhere".
-        result = await analyze_page(url, semaphore, stop_event=stop_event)
-        if result is None:
-            return
-        await on_result(result)
+    async def worker() -> None:
+        # popleft() has no await between the emptiness check and the pop, so on
+        # asyncio's single thread no two workers can take the same URL.
+        while pending:
+            if stop_event is not None and stop_event.is_set():
+                return
+            url = pending.popleft()
+            result = await analyze_page(url, semaphore, stop_event=stop_event)
+            if result is None:
+                continue
+            await on_result(result)
 
-    await asyncio.gather(*(worker(url) for url in urls))
+    workers = [asyncio.create_task(worker()) for _ in range(min(PAGE_CONCURRENCY, len(urls)))]
+    try:
+        await asyncio.gather(*workers)
+    finally:
+        # On cancellation (crawl deadline / stall / stop) make sure no worker is
+        # left pending: cancel any still running and await their unwind.
+        for w in workers:
+            if not w.done():
+                w.cancel()
+        if workers:
+            await asyncio.gather(*workers, return_exceptions=True)

@@ -42,6 +42,9 @@ async def test_second_audit_is_queued_while_slot_held_then_runs_when_freed(monke
     monkeypatch.setattr(jobs_module, "run_pages", fake_run_pages)
 
     manager = JobManager()
+    # This test is specifically about the queued state, so force the single
+    # execution slot regardless of the (now higher) default MAX_CONCURRENT_AUDITS.
+    manager.audit_slots = asyncio.Semaphore(1)
 
     job_a = await manager.create("https://a.example.ru/", client_ip="1.1.1.1")
     # Let A's background task start and grab the only slot.
