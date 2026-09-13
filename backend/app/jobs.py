@@ -14,7 +14,11 @@ from fastapi import HTTPException
 from .audit import ACCESS_BLOCKED_STATUS_CODES, discover_audit_urls, run_pages
 from .canonical_resolve import resolve_canonicals
 from .config import (
-    AUDIT_TIMEOUT,
+    CRAWL_BASE_SECONDS,
+    CRAWL_MAX_SECONDS,
+    CRAWL_PER_PAGE_SECONDS,
+    CRAWL_STALL_TIMEOUT,
+    DISCOVERY_TIMEOUT,
     DOMAIN_COOLDOWN_SECONDS,
     JOB_TTL_SECONDS,
     MAX_AUDIT_URLS,
@@ -33,6 +37,27 @@ logger = logging.getLogger("uvicorn.error")
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# A page whose only outcome was a per-page timeout or an outright connection
+# failure is NOT a sign the crawl is making progress - the site never actually
+# answered. These are the check_reason values (see
+# audit._classify_fetch_failure_reason and audit.analyze_page) that the stall
+# watchdog must NOT treat as progress.
+_STALL_LIVENESS_FAILURE_REASONS = frozenset({"timeout", "network"})
+
+
+def crawl_deadline_seconds(num_pages: int) -> float:
+    """Wall-clock budget for the page-crawl phase, scaled to the amount of real
+    work (number of discovered pages) and capped by a hard maximum.
+
+    This is what makes the up-to-MAX_AUDIT_URLS limit a *real* functional limit
+    rather than a formal one: a healthy site whose pages answer in a few seconds
+    is given enough time to actually finish all of them, while the hard cap
+    bounds how long any single audit can occupy the (single) audit slot, and a
+    small pathological site is given only a correspondingly small budget.
+    """
+    return min(CRAWL_MAX_SECONDS, CRAWL_BASE_SECONDS + CRAWL_PER_PAGE_SECONDS * num_pages)
 
 
 def _format_wait(seconds: int) -> str:
@@ -339,6 +364,90 @@ class JobManager:
 
         return on_result
 
+    async def _supervised_crawl(
+        self,
+        job: Job,
+        urls: list[str],
+        stop_event: asyncio.Event,
+        deadline_seconds: float,
+    ) -> str:
+        """Run the page crawl under two independent bounds and return why it
+        ended: "completed" (every page attempted), "deadline" (the work-scaled
+        crawl deadline was reached), or "stall" (no page completed for
+        CRAWL_STALL_TIMEOUT - a genuine total stall).
+
+        The crawl primitive (audit.run_pages) is unchanged: it dispatches all
+        workers at PAGE_CONCURRENCY, each page bounded by PAGE_TIMEOUT, and each
+        finished page is reported through on_result. This method only supervises
+        it - watching wall-clock and progress, and, on either bound firing,
+        setting stop_event (cheap early-out for not-yet-started workers) and
+        cancelling the crawl task (hard-stops in-flight fetches). It then awaits
+        the cancelled task so no worker/httpx task is left pending afterwards.
+        Results already delivered to on_result stay in the job untouched, so the
+        partial result is honest.
+        """
+        last_progress = monotonic()
+
+        base_on_result = self._make_on_result(job, stop_event)
+
+        async def on_result(result: PageResult) -> None:
+            nonlocal last_progress
+            # "Progress" for the stall watchdog means the site actually
+            # responded to at least one page - NOT merely that another
+            # PageResult was produced. A page that only ever hit its own
+            # PAGE_TIMEOUT (or failed to connect at all) yields a check_failed
+            # result with check_reason "timeout"/"network" every ~PAGE_TIMEOUT;
+            # since PAGE_TIMEOUT (30 s) < CRAWL_STALL_TIMEOUT (60 s), a totally
+            # unresponsive site would emit such a batch inside every stall
+            # window and, if that counted as progress, keep the watchdog from
+            # ever firing - letting a dead site hold the slot until the full
+            # CRAWL_MAX_SECONDS. So those two reasons are excluded here. Every
+            # other outcome - a 2xx, an HTTP 4xx/5xx, an access_blocked 401/403,
+            # a wrong content-type, or a page with SEO errors - means the server
+            # genuinely answered, and DOES count as progress, so ordinary
+            # HTTP/SEO failures never cause a false stall.
+            if not (result.check_failed and result.check_reason in _STALL_LIVENESS_FAILURE_REASONS):
+                last_progress = monotonic()
+            await base_on_result(result)
+
+        crawl = asyncio.ensure_future(run_pages(urls, on_result, stop_event=stop_event))
+        deadline_at = monotonic() + deadline_seconds
+        outcome = "completed"
+        try:
+            while not crawl.done():
+                time_to_deadline = deadline_at - monotonic()
+                if time_to_deadline <= 0:
+                    outcome = "deadline"
+                    break
+                # Wake at least every CRAWL_STALL_TIMEOUT to evaluate progress,
+                # but never sleep past the deadline.
+                slice_timeout = min(time_to_deadline, CRAWL_STALL_TIMEOUT)
+                done, _pending = await asyncio.wait({crawl}, timeout=slice_timeout)
+                if crawl in done:
+                    # Propagate any unexpected exception from the crawl (a real
+                    # bug) instead of silently reporting "completed".
+                    crawl.result()
+                    outcome = "completed"
+                    break
+                if monotonic() - last_progress >= CRAWL_STALL_TIMEOUT:
+                    outcome = "stall"
+                    break
+        finally:
+            if not crawl.done():
+                # Tell not-yet-started workers to bail cheaply, then hard-cancel
+                # whatever is still in flight and await the unwind so nothing is
+                # left pending (no "Task was destroyed but it is pending").
+                stop_event.set()
+                crawl.cancel()
+                try:
+                    await crawl
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    logger.exception("Audit %s crawl cleanup raised, ip=%s", job.job_id, job.client_ip)
+
+        return outcome
+
     async def _run(self, job: Job) -> None:
         queued_at = monotonic()
         async with self.audit_slots:
@@ -356,86 +465,152 @@ class JobManager:
                     job.requested_url,
                 )
 
-                async def execute_audit() -> None:
-                    discovery_started = monotonic()
-                    discovered = await discover_audit_urls(job.requested_url)
-                    urls: list[str] = discovered["urls"]
-                    access_blocked_status = discovered.get("access_blocked_status")
-                    logger.info(
-                        "Audit %s discovery completed in %.3fs: %s pages, %s sitemap(s), ip=%s",
-                        job.job_id,
-                        monotonic() - discovery_started,
-                        len(urls),
-                        len(discovered["sitemap_urls"]),
-                        job.client_ip,
+                # ---- Phase 1: discovery, bounded on its own so a slow or
+                # stalled robots/sitemap phase can never consume the crawl's
+                # budget (see DISCOVERY_TIMEOUT). ----
+                discovery_started = monotonic()
+                try:
+                    discovered = await asyncio.wait_for(
+                        discover_audit_urls(job.requested_url),
+                        timeout=DISCOVERY_TIMEOUT,
                     )
-
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "Audit %s discovery timed out after %.0fs: ip=%s url=%s",
+                        job.job_id,
+                        DISCOVERY_TIMEOUT,
+                        job.client_ip,
+                        job.requested_url,
+                    )
                     async with job.lock:
-                        job.normalized_url = discovered["normalized_url"]
-                        job.robots_url = discovered["robots_url"]
-                        job.robots_found = discovered["robots_found"]
-                        job.robots_sitemap_urls = discovered["robots_sitemap_urls"]
-                        job.sitemap_urls = discovered["sitemap_urls"]
-                        job.sitemap_issues = discovered.get("sitemap_issues", [])
-                        job.sitemap_declared_unfetched = discovered.get("sitemap_declared_unfetched", False)
-                        job.discovered_urls = len(urls)
-                        job.limited = discovered["limited"]
-                        job.access_blocked_status = access_blocked_status
-                        job.status = "running"
-
-                    if access_blocked_status is not None:
-                        logger.warning(
-                            "Audit %s stopped at entry URL: HTTP %s blocks automated access, ip=%s url=%s",
-                            job.job_id,
-                            access_blocked_status,
-                            job.client_ip,
-                            job.requested_url,
+                        job.status = "failed"
+                        job.error = (
+                            "Не удалось получить структуру сайта (robots.txt / sitemap) за "
+                            f"{int(DISCOVERY_TIMEOUT)} секунд. Попробуйте ещё раз позже."
                         )
-                        return
+                        job.completed_at = utcnow()
+                    return
 
-                    stop_event = asyncio.Event()
-                    on_result = self._make_on_result(job, stop_event)
-
-                    await run_pages(urls, on_result, stop_event=stop_event)
-                    self._apply_meta_duplicate_warnings(job.results)
-                    # Cross-page canonical resolution: synchronous, in-memory,
-                    # never any network. Covers normal completion and the
-                    # blocked-mid-audit partial (run_pages returns normally in
-                    # both). The AUDIT_TIMEOUT partial path calls it separately
-                    # in the TimeoutError handler below, on whatever we have.
-                    resolve_canonicals(job.results)
-
-                await asyncio.wait_for(execute_audit(), timeout=AUDIT_TIMEOUT)
+                urls: list[str] = discovered["urls"]
+                access_blocked_status = discovered.get("access_blocked_status")
+                logger.info(
+                    "Audit %s discovery completed in %.3fs: %s pages, %s sitemap(s), ip=%s",
+                    job.job_id,
+                    monotonic() - discovery_started,
+                    len(urls),
+                    len(discovered["sitemap_urls"]),
+                    job.client_ip,
+                )
 
                 async with job.lock:
-                    if job.blocked_mid_audit:
-                        job.status = "completed_partial"
-                        job.partial_reason = (
-                            "Сайт начал ограничивать автоматические запросы HeadInspect во время "
-                            f"проверки (сервер стал отвечать HTTP {job.mid_audit_block_status}). "
-                            f"Показаны результаты {job.checked_urls} страниц, проверенных до начала "
-                            "ограничения; остальные страницы не проверялись, чтобы не создавать лишнюю "
-                            "нагрузку на сайт."
-                        )
-                    elif job.sitemap_declared_unfetched:
-                        # A sitemap was declared in robots.txt but could not be
-                        # fetched, so discovery fell back to auditing only the
-                        # entry page. The entry page itself audited fine, but the
-                        # site was NOT fully discovered - surface that via the
-                        # standard partial-completion notice (rendered on every
-                        # module by HI.renderPartialNotice).
-                        job.status = "completed_partial"
-                        job.partial_reason = (
-                            "Sitemap указан в robots.txt, но HeadInspect не смог его получить. "
-                            "Проверена только стартовая страница."
-                        )
-                    else:
+                    job.normalized_url = discovered["normalized_url"]
+                    job.robots_url = discovered["robots_url"]
+                    job.robots_found = discovered["robots_found"]
+                    job.robots_sitemap_urls = discovered["robots_sitemap_urls"]
+                    job.sitemap_urls = discovered["sitemap_urls"]
+                    job.sitemap_issues = discovered.get("sitemap_issues", [])
+                    job.sitemap_declared_unfetched = discovered.get("sitemap_declared_unfetched", False)
+                    job.discovered_urls = len(urls)
+                    job.limited = discovered["limited"]
+                    job.access_blocked_status = access_blocked_status
+                    job.status = "running"
+
+                if access_blocked_status is not None:
+                    logger.warning(
+                        "Audit %s stopped at entry URL: HTTP %s blocks automated access, ip=%s url=%s",
+                        job.job_id,
+                        access_blocked_status,
+                        job.client_ip,
+                        job.requested_url,
+                    )
+                    async with job.lock:
                         job.status = "completed"
+                        job.completed_at = utcnow()
+                    return
+
+                # ---- Phase 2: page crawl, bounded by a work-scaled deadline
+                # plus a no-progress stall watchdog, with clean cancellation of
+                # any in-flight workers on stop (see _supervised_crawl). ----
+                stop_event = asyncio.Event()
+                crawl_deadline = crawl_deadline_seconds(len(urls))
+                outcome = await self._supervised_crawl(job, urls, stop_event, crawl_deadline)
+
+                # Cross-page passes over whatever we collected. Both cover the
+                # full-completion and the stopped-early (deadline/stall/blocked)
+                # cases identically: they are synchronous, never touch the
+                # network, and a target missing from a partial map is simply
+                # "not checked", never an error.
+                self._apply_meta_duplicate_warnings(job.results)
+                resolve_canonicals(job.results)
+
+                async with job.lock:
+                    if outcome == "completed":
+                        if job.blocked_mid_audit:
+                            job.status = "completed_partial"
+                            job.partial_reason = (
+                                "Сайт начал ограничивать автоматические запросы HeadInspect во время "
+                                f"проверки (сервер стал отвечать HTTP {job.mid_audit_block_status}). "
+                                f"Показаны результаты {job.checked_urls} страниц, проверенных до начала "
+                                "ограничения; остальные страницы не проверялись, чтобы не создавать лишнюю "
+                                "нагрузку на сайт."
+                            )
+                        elif job.sitemap_declared_unfetched:
+                            # A sitemap was declared in robots.txt but could not
+                            # be fetched, so discovery fell back to auditing only
+                            # the entry page. Surface that via the standard
+                            # partial-completion notice (HI.renderPartialNotice).
+                            job.status = "completed_partial"
+                            job.partial_reason = (
+                                "Sitemap указан в robots.txt, но HeadInspect не смог его получить. "
+                                "Проверена только стартовая страница."
+                            )
+                        else:
+                            job.status = "completed"
+                    else:
+                        # outcome in {"deadline", "stall"}: the crawl was stopped
+                        # before every discovered page could be checked. Keep the
+                        # pages we did collect as an honest partial result.
+                        if job.checked_urls > 0:
+                            job.status = "completed_partial"
+                            if job.blocked_mid_audit:
+                                job.partial_reason = (
+                                    "Сайт начал ограничивать автоматические запросы HeadInspect во время "
+                                    f"проверки (сервер стал отвечать HTTP {job.mid_audit_block_status}), а "
+                                    "затем проверка была остановлена по лимиту времени. Показаны результаты "
+                                    f"{job.checked_urls} страниц из {job.discovered_urls} найденных."
+                                )
+                            elif outcome == "stall":
+                                job.partial_reason = (
+                                    "Проверка была остановлена: сайт перестал отвечать (ни одного ответа "
+                                    f"дольше {int(CRAWL_STALL_TIMEOUT)} секунд). Показаны результаты "
+                                    f"{job.checked_urls} страниц из {job.discovered_urls} найденных."
+                                )
+                            else:  # deadline
+                                job.partial_reason = (
+                                    f"Проверка достигла лимита времени ({int(crawl_deadline)} секунд) и была "
+                                    "остановлена до завершения. Показаны результаты "
+                                    f"{job.checked_urls} страниц из {job.discovered_urls} найденных."
+                                )
+                        else:
+                            job.status = "failed"
+                            if outcome == "stall":
+                                job.error = (
+                                    "Сайт перестал отвечать, ни одной страницы проверить не удалось. "
+                                    "Попробуйте ещё раз позже."
+                                )
+                            else:  # deadline
+                                job.error = (
+                                    f"Проверка достигла лимита времени ({int(crawl_deadline)} секунд), "
+                                    "ни одной страницы проверить не удалось. Попробуйте ещё раз позже."
+                                )
                     job.completed_at = utcnow()
+
                 elapsed = (job.completed_at - job.started_at).total_seconds() if job.started_at and job.completed_at else 0.0
                 logger.info(
-                    "Audit %s completed in %.3fs: %s/%s pages, errors=%s, warnings=%s, blocked_mid_audit=%s, ip=%s",
+                    "Audit %s finished (%s, %s) in %.3fs: %s/%s pages, errors=%s, warnings=%s, blocked_mid_audit=%s, ip=%s",
                     job.job_id,
+                    job.status,
+                    outcome,
                     elapsed,
                     job.checked_urls,
                     job.discovered_urls,
@@ -444,45 +619,6 @@ class JobManager:
                     job.blocked_mid_audit,
                     job.client_ip,
                 )
-
-            except asyncio.TimeoutError:
-                logger.error(
-                    "Audit %s timed out after %.0f seconds: ip=%s url=%s, checked=%s",
-                    job.job_id,
-                    AUDIT_TIMEOUT,
-                    job.client_ip,
-                    job.requested_url,
-                    job.checked_urls,
-                )
-                async with job.lock:
-                    if job.checked_urls > 0:
-                        # We already have usable data for some pages - do not
-                        # discard it. Report what we have as a partial result
-                        # instead of a bare failure. Resolve canonicals over
-                        # the pages we did collect (a target missing from this
-                        # partial map is simply "not checked", never an error).
-                        resolve_canonicals(job.results)
-                        job.status = "completed_partial"
-                        if job.blocked_mid_audit:
-                            job.partial_reason = (
-                                "Сайт начал ограничивать автоматические запросы HeadInspect во время "
-                                f"проверки (сервер стал отвечать HTTP {job.mid_audit_block_status}), а "
-                                f"затем истёк общий лимит времени проверки. Показаны результаты "
-                                f"{job.checked_urls} страниц из {job.discovered_urls} найденных."
-                            )
-                        else:
-                            job.partial_reason = (
-                                f"Проверка заняла больше {int(AUDIT_TIMEOUT)} секунд и была остановлена "
-                                "до завершения. Показаны результаты "
-                                f"{job.checked_urls} страниц из {job.discovered_urls} найденных."
-                            )
-                    else:
-                        job.status = "failed"
-                        job.error = (
-                            f"Проверка заняла больше {int(AUDIT_TIMEOUT)} секунд и была остановлена. "
-                            "Попробуйте ещё раз позже."
-                        )
-                    job.completed_at = utcnow()
             except HTTPException as exc:
                 logger.warning("Audit %s failed: %s, ip=%s", job.job_id, exc.detail, job.client_ip)
                 async with job.lock:

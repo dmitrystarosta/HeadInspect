@@ -155,7 +155,6 @@ def _discovery(**overrides):
 
 
 async def _run_job(monkeypatch, discovery):
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 30)
 
     async def discover(url):
         return discovery

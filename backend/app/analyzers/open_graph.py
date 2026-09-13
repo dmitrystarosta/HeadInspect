@@ -16,7 +16,7 @@ from ..config import (
 )
 from ..fetcher import safe_fetch
 from ..models import OpenGraphData
-from ..security import resolve_relative_url, validate_public_url
+from ..security import normalize_public_url, resolve_relative_url
 
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
@@ -66,8 +66,16 @@ async def analyze_open_graph(
         return data, errors, warnings
 
     try:
+        # Syntactic normalization only - NOT validate_public_url. Resolving DNS
+        # here (once per page's og:image, discarding the result) duplicates the
+        # resolve+validate+pin that safe_fetch does immediately before the real
+        # image request just below. normalize_public_url still enforces scheme /
+        # hostname / credentials / blocked-hostname / port. Connect-time SSRF is
+        # unchanged and authoritative in safe_fetch; an og:image that only
+        # resolves to a forbidden/unreachable address is caught there and
+        # reported as "og:image недоступен", never connected to.
         absolute_image_url = resolve_relative_url(page_url, data.image)
-        absolute_image_url = await validate_public_url(absolute_image_url)
+        absolute_image_url = normalize_public_url(absolute_image_url)
         data.image = absolute_image_url
     except HTTPException as exc:
         data.image_accessible = False

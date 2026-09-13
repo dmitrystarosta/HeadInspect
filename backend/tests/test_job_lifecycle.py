@@ -10,6 +10,17 @@ from app.jobs import Job, JobManager
 from app.models import PageResult
 
 
+def _tiny_crawl_deadline(monkeypatch, seconds=0.05):
+    """Force the page-crawl deadline to ~`seconds` and disable the stall
+    watchdog, so a test can drive the "crawl stopped by its time limit" path
+    deterministically. Mirrors how production computes the deadline via
+    crawl_deadline_seconds(), just clamped tiny."""
+    monkeypatch.setattr(jobs_module, "CRAWL_BASE_SECONDS", seconds)
+    monkeypatch.setattr(jobs_module, "CRAWL_PER_PAGE_SECONDS", 0.0)
+    monkeypatch.setattr(jobs_module, "CRAWL_MAX_SECONDS", seconds)
+    monkeypatch.setattr(jobs_module, "CRAWL_STALL_TIMEOUT", 30.0)
+
+
 def test_get_missing_job_raises_404_with_stable_contract():
     """Item 7's backend half: the API contract stays a clean 404 with a
     `detail` string - the frontend is responsible for turning this into the
@@ -23,11 +34,11 @@ def test_get_missing_job_raises_404_with_stable_contract():
 
 
 async def test_audit_timeout_with_partial_results_becomes_completed_partial(monkeypatch):
-    """Item 8: if AUDIT_TIMEOUT fires but some pages were already checked,
+    """Item 8: if the crawl deadline fires but some pages were already checked,
     the job must not be reported as a bare failure - it must carry the
     partial results plus a clear, non-alarming reason.
     """
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 0.05)
+    _tiny_crawl_deadline(monkeypatch)
 
     async def fake_discover_audit_urls(url):
         return {
@@ -44,7 +55,7 @@ async def test_audit_timeout_with_partial_results_becomes_completed_partial(monk
 
     async def fake_run_pages(urls, on_result, *, stop_event=None):
         # Simulate checking a couple of pages quickly, then hanging well
-        # past AUDIT_TIMEOUT (as a genuinely slow/unresponsive site would).
+        # past the crawl deadline (as a genuinely slow/unresponsive site would).
         await on_result(PageResult(url=urls[0], requested_url=urls[0], status_code=200))
         await on_result(PageResult(url=urls[1], requested_url=urls[1], status_code=200))
         await asyncio.sleep(10)
@@ -67,7 +78,7 @@ async def test_audit_timeout_with_zero_checked_pages_stays_a_plain_failure(monke
     """The other half of item 8: if not even one page was checked before the
     timeout, a plain failure is still the right, honest outcome.
     """
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 0.05)
+    monkeypatch.setattr(jobs_module, "DISCOVERY_TIMEOUT", 0.05)
 
     async def fake_discover_audit_urls(url):
         await asyncio.sleep(10)  # discovery itself hangs
@@ -90,7 +101,6 @@ async def test_single_blocked_page_does_not_stop_the_whole_audit(monkeypatch):
     block (see tests/test_jobs_block_detection... covered here at the
     JobManager._run level for completeness).
     """
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 30)
 
     urls = [f"https://example.ru/p{i}" for i in range(10)]
 
@@ -143,7 +153,6 @@ async def test_entry_page_access_blocked_still_stops_before_any_page_checks(monk
     stop discovery entirely and surface access_blocked_status, unchanged by
     today's work.
     """
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 30)
 
     async def fake_discover_audit_urls(url):
         return {
@@ -180,7 +189,7 @@ async def test_status_and_results_model_serialize_with_real_pydantic(monkeypatch
     methods directly, with every new field populated, against the real
     Pydantic models to close that gap.
     """
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 0.05)
+    _tiny_crawl_deadline(monkeypatch)
 
     async def fake_discover_audit_urls(url):
         return {
@@ -198,7 +207,7 @@ async def test_status_and_results_model_serialize_with_real_pydantic(monkeypatch
     async def fake_run_pages(urls, on_result, *, stop_event=None):
         await on_result(PageResult(url=urls[0], requested_url=urls[0], status_code=200))
         await on_result(PageResult(url=urls[1], requested_url=urls[1], status_code=403, errors=["HTTP 403"]))
-        await asyncio.sleep(10)  # force AUDIT_TIMEOUT -> completed_partial, with blocked_mid_audit still False here
+        await asyncio.sleep(10)  # force crawl deadline -> completed_partial, with blocked_mid_audit still False here
 
     monkeypatch.setattr(jobs_module, "discover_audit_urls", fake_discover_audit_urls)
     monkeypatch.setattr(jobs_module, "run_pages", fake_run_pages)

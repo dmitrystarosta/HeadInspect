@@ -137,16 +137,23 @@ async def test_7_3_large_url_list_does_not_produce_mass_false_timeouts(monkeypat
     )
 
 
-async def test_7_4_audit_timeout_never_labels_unstarted_urls_as_page_timeouts(monkeypatch):
-    """Item 7.4: when the *global* AUDIT_TIMEOUT fires, URLs that never got
-    a chance to start (still queued behind PAGE_CONCURRENCY, or simply
-    never dispatched) must not appear in results with check_reason='timeout'
-    or count as check_failed - they are simply absent, and checked_urls
-    honestly reflects only what was actually attempted.
+async def test_7_4_crawl_deadline_never_labels_unstarted_urls_as_page_timeouts(monkeypatch):
+    """Item 7.4: when the crawl deadline (the work-scaled bound that replaced
+    the single global AUDIT_TIMEOUT) fires, URLs that never got a chance to
+    start (still queued behind PAGE_CONCURRENCY, or simply never dispatched)
+    must not appear in results with check_reason='timeout' or count as
+    check_failed - they are simply absent, and checked_urls honestly reflects
+    only what was actually attempted.
     """
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 0.15)
+    # Force a tiny crawl deadline so the crawl is cut off mid-way. Stall
+    # watchdog kept high: pages ARE completing here, so the *deadline* is what
+    # must stop it, not a stall.
+    monkeypatch.setattr(jobs_module, "CRAWL_BASE_SECONDS", 0.15)
+    monkeypatch.setattr(jobs_module, "CRAWL_PER_PAGE_SECONDS", 0.0)
+    monkeypatch.setattr(jobs_module, "CRAWL_MAX_SECONDS", 0.15)
+    monkeypatch.setattr(jobs_module, "CRAWL_STALL_TIMEOUT", 30.0)
     monkeypatch.setattr(audit_module, "PAGE_CONCURRENCY", 2)
-    monkeypatch.setattr(audit_module, "PAGE_TIMEOUT", 30.0)  # real value - AUDIT_TIMEOUT is what cuts this short
+    monkeypatch.setattr(audit_module, "PAGE_TIMEOUT", 30.0)  # real value - the crawl deadline is what cuts this short
 
     urls = [f"https://example.ru/p{i}" for i in range(40)]
 
@@ -164,7 +171,7 @@ async def test_7_4_audit_timeout_never_labels_unstarted_urls_as_page_timeouts(mo
     monkeypatch.setattr(jobs_module, "discover_audit_urls", fake_discover_audit_urls)
     monkeypatch.setattr(audit_module, "safe_fetch", fake_safe_fetch)
     # jobs.py imports run_pages directly - use the real one so PAGE_CONCURRENCY=2
-    # actually throttles this test meaningfully and AUDIT_TIMEOUT has URLs
+    # actually throttles this test meaningfully and the crawl deadline has URLs
     # left over to cut off.
     monkeypatch.setattr(jobs_module, "run_pages", audit_module.run_pages)
 
@@ -176,7 +183,7 @@ async def test_7_4_audit_timeout_never_labels_unstarted_urls_as_page_timeouts(mo
     assert job.partial_reason is not None
     # Every page actually present in results genuinely completed - none of
     # them can be a "timeout" here, since each one's own work (0.03s) is
-    # far under PAGE_TIMEOUT (30s); only AUDIT_TIMEOUT cut off the *rest*.
+    # far under PAGE_TIMEOUT (30s); only the crawl deadline cut off the *rest*.
     assert all(r.check_reason != "timeout" for r in job.results)
     assert all(not r.check_failed for r in job.results)
     # Honest, non-inflated accounting: checked_urls reflects only what was

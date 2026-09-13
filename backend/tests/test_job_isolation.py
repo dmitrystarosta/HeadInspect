@@ -19,7 +19,6 @@ from app.models import PageResult
 
 
 async def test_sequential_jobs_do_not_share_any_state(monkeypatch):
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 30)
     manager = JobManager()
 
     # --- Job A: zipkran.ru-shaped run - blocked mid-audit, completed_partial,
@@ -184,7 +183,6 @@ async def test_check_reason_does_not_leak_between_sequential_jobs(monkeypatch):
     check_reason values, and job A's stored results must be untouched by
     running job B.
     """
-    monkeypatch.setattr(jobs_module, "AUDIT_TIMEOUT", 30)
     manager = JobManager()
 
     urls_a = [f"https://zipkran.ru/p{i}" for i in range(10)]

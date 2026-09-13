@@ -11,8 +11,47 @@ USER_AGENT = os.getenv(
 CONNECT_TIMEOUT = 5.0
 READ_TIMEOUT = 10.0
 DNS_TIMEOUT = 8.0
+
+# Per-page liveness bound: a single page's own fetch+analyze work may take at
+# most this long (applied inside audit.analyze_page, around the real work only,
+# never around the semaphore wait). Guarantees one hung/slow page can never
+# hold a worker forever - it is turned into a check_failed "timeout" result and
+# the worker moves on.
 PAGE_TIMEOUT = 30.0
-AUDIT_TIMEOUT = 90.0
+
+# --- Job execution budget ------------------------------------------------
+# The audit is NOT bounded by a single fixed wall-clock over discovery+crawl.
+# That old model (one 90 s AUDIT_TIMEOUT around everything) truncated healthy
+# large sites purely because legitimate work takes time: at ~2.8 s/page and
+# PAGE_CONCURRENCY workers, throughput is bounded, so a fixed 90 s could only
+# ever reach ~70-80 pages regardless of the 500-page functional limit. Instead
+# the two phases are bounded independently, and the crawl budget scales with
+# the amount of real work while staying capped:
+#
+#   * DISCOVERY_TIMEOUT bounds only discovery (entry + robots + sitemaps), so a
+#     slow/stalled discovery can't silently consume the crawl's budget. Real
+#     discovery finishes well under it; only a stall hits it.
+DISCOVERY_TIMEOUT = 30.0
+#
+#   * The page crawl gets a deadline that scales with the number of discovered
+#     pages, capped by a hard maximum:
+#         crawl_deadline = min(CRAWL_MAX_SECONDS,
+#                              CRAWL_BASE_SECONDS + CRAWL_PER_PAGE_SECONDS * n)
+#     Sizing: measured slow sites answer in ~2.8 s/page; with PAGE_CONCURRENCY=4
+#     that is ~0.77 s of wall-clock per discovered page. CRAWL_PER_PAGE_SECONDS
+#     is set ~1.4x above that so a healthy crawl finishes comfortably inside its
+#     deadline instead of racing it, and a full 500-page slow-but-healthy site
+#     still completes (500 * ~0.8 s ≈ 400 s < CRAWL_MAX_SECONDS). A small
+#     pathological site gets a correspondingly small budget and is cut quickly.
+CRAWL_BASE_SECONDS = 30.0
+CRAWL_PER_PAGE_SECONDS = 1.1
+CRAWL_MAX_SECONDS = 600.0
+#
+#   * A progress watchdog stops the crawl if NOT ONE page completes for this
+#     long, even before the deadline. It must exceed PAGE_TIMEOUT so a run of
+#     legitimately slow-but-alive pages (each up to PAGE_TIMEOUT) never trips
+#     it - only a genuine, total stall (network black hole, mass hang) does.
+CRAWL_STALL_TIMEOUT = 60.0
 MAX_REDIRECTS = 5
 
 MAX_AUDIT_URLS = 500

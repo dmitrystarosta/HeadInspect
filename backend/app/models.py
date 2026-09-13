@@ -210,9 +210,10 @@ class AuditJobStatus(BaseModel):
     completed_at: datetime | None = None
     error: str | None = None
     # Populated only when status == "completed_partial": a human-readable,
-    # non-alarming explanation of why the audit is incomplete (AUDIT_TIMEOUT
-    # reached, or the site started blocking automated requests), distinct
-    # from `error`, which is reserved for status == "failed".
+    # non-alarming explanation of why the audit is incomplete (the crawl
+    # deadline was reached, the site stalled, or it started blocking automated
+    # requests), distinct from `error`, which is reserved for status ==
+    # "failed".
     partial_reason: str | None = None
 
 
