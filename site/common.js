@@ -76,12 +76,24 @@
   // a timeout reported by the API, a job that no longer exists, a network
   // failure, and so on. `message` is always safe to show to the user as-is.
   class ApiError extends Error {
-    constructor(message, { status = null, code = null } = {}) {
+    constructor(message, { status = null, code = null, retryAfter = null } = {}) {
       super(message);
       this.name = "ApiError";
       this.status = status;
       this.code = code;
+      this.retryAfter = retryAfter;
     }
+  }
+
+  // Retry-After from the response header (seconds), falling back to a
+  // `retry_after` field in the JSON body. Returns a positive integer or null.
+  function parseRetryAfter(response, data) {
+    const header = response && response.headers && response.headers.get
+      ? response.headers.get("Retry-After")
+      : null;
+    const raw = header != null ? header : (data && data.retry_after != null ? data.retry_after : null);
+    const seconds = raw != null ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
   }
 
   async function apiFetch(path, options = {}) {
@@ -96,11 +108,21 @@
       });
     } catch (error) {
       if (error && error.name === "AbortError") throw error;
-      // A network-level failure (offline, DNS, CORS, etc.) is still an
-      // "expected" kind of problem from the user's point of view, not a bug.
+      // fetch() rejects ONLY when no readable HTTP response was obtained at all:
+      // the browser is offline, DNS/connection failed, or a cross-origin
+      // response was refused (e.g. an error response returned without CORS
+      // headers, or a blocked preflight). A received HTTP error - 429, 503, any
+      // 4xx/5xx - does NOT land here; it resolves and is handled below with the
+      // server's own message. So only claim "check your internet" when the
+      // browser is actually offline; otherwise the server is reachable but we
+      // couldn't read a response (often because it is rate-limiting us), and
+      // saying "no connection" would be wrong.
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
       throw new ApiError(
-        "Не удалось связаться с сервером HeadInspect. Проверьте подключение к интернету.",
-        { code: "network" }
+        offline
+          ? "Не удалось связаться с сервером HeadInspect. Проверьте подключение к интернету."
+          : "Сервер HeadInspect сейчас не отвечает или временно ограничивает запросы. Подождите немного и повторите попытку.",
+        { code: offline ? "offline" : "unreachable" }
       );
     }
 
@@ -108,9 +130,16 @@
     try { data = await response.json(); } catch { /* no/invalid JSON body */ }
 
     if (!response.ok) {
-      const detail = data && data.detail ? data.detail : null;
-      const code = response.status === 404 ? "not_found" : null;
-      throw new ApiError(detail || `Ошибка API (${response.status})`, { status: response.status, code });
+      // We DID get an HTTP response - surface it with the backend's own,
+      // already-human message; never as a connection failure.
+      const detail = data && typeof data.detail === "string" ? data.detail : null;
+      const retryAfter = parseRetryAfter(response, data);
+      const code =
+        response.status === 404 ? "not_found" :
+        response.status === 429 ? "rate_limited" : null;
+      throw new ApiError(detail || `Ошибка API (${response.status})`, {
+        status: response.status, code, retryAfter,
+      });
     }
 
     return data;

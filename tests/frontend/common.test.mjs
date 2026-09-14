@@ -111,7 +111,7 @@ test("apiFetch wraps a network failure (not an AbortError) into a friendly ApiEr
   const { HI } = setup({ fetchImpl });
   await assert.rejects(
     () => HI.apiFetch("/api/audits/x"),
-    err => err instanceof HI.ApiError && err.code === "network"
+    err => err instanceof HI.ApiError && (err.code === "offline" || err.code === "unreachable")
   );
 });
 
