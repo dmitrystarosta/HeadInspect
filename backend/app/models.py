@@ -8,6 +8,11 @@ from pydantic import BaseModel, Field
 
 class AuditRequest(BaseModel):
     url: str = Field(..., examples=["https://example.ru"])
+    # Which surface started the audit (home → "general", a module page →
+    # "meta"/"images"/…). Optional and additive: old clients that omit it keep
+    # working. Used only for the internal daily-report statistics (audit type);
+    # never affects the audit itself. No personal data.
+    source: str | None = Field(default=None, max_length=32)
 
 
 class OpenGraphData(BaseModel):

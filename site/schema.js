@@ -293,7 +293,7 @@ function renderRows() {
         <span class="result-dot" aria-hidden="true"></span>
         <span class="result-path">${escapeHtml(row.path)}</span>
         <span class="result-message">${escapeHtml(row.message)}</span>
-        <span class="result-chevron" aria-hidden="true">⌄</span>
+        <span class="result-chevron" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       </button>
       <div class="result-item-detail" hidden></div>
     `;

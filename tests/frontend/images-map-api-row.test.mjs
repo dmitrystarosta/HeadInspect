@@ -101,6 +101,31 @@ test("images.js imageLine: inconclusive availability shows the note", () => {
   assert.match(line.code, /не удалось определить/);
 });
 
+test("images.js imageLine: srcset variant is never flagged for missing alt", () => {
+  const { imageLine } = loadImages();
+  const line = imageLine({
+    src: "https://example.ru/main-2x.png", source: "srcset", has_alt: false,
+    accessible: true, status_code: 200, checked: true, reuse_count: 1,
+    errors: [], warnings: [],
+  });
+  assert.doesNotMatch(line.hint, /нет alt/);
+  assert.match(line.hint, /вариант srcset/);
+});
+
+test("images.js imageLine: a not-checked image is neutral 'не проверено', not an error", () => {
+  const { imageLine } = loadImages();
+  const line = imageLine({
+    src: "https://example.ru/q.png", source: "img", has_alt: true, alt: "x",
+    width_attr: "1", height_attr: "1",
+    accessible: null, checked: false,
+    availability_note: "не проверено: превышен лимит проверок изображений за аудит",
+    reuse_count: 1, errors: [], warnings: [],
+  });
+  assert.equal(line.state, "muted");
+  // The reason from availability_note is surfaced, not a bare "не проверено".
+  assert.equal(line.code, "не проверено: превышен лимит проверок изображений за аудит");
+});
+
 test("home.js moduleTotals sums images errors/warnings", () => {
   const sandbox = buildSandbox();
   loadCommon(sandbox);

@@ -64,6 +64,70 @@ def _guess_format(url: str | None) -> str | None:
     return _EXT_FORMATS.get(last.rsplit(".", 1)[-1].lower())
 
 
+# Known analytics / tracking-pixel endpoints. These are not content images, so
+# they are excluded from the Images audit entirely - not counted, not
+# HEAD-checked, never producing warnings or errors. Recognised by their host
+# (and, for hosts that also serve real content, by path) - i.e. by purpose,
+# NOT by a 1×1 size - so ordinary small, empty-alt or third-party images are
+# never dropped just for being small. Matched on the resolved absolute URL, so
+# it works however the pixel is written in the HTML (protocol-relative src,
+# inside <noscript>, query strings, etc.).
+_TRACKER_HOST_SUFFIXES = (
+    "mc.yandex.ru", "mc.yandex.com", "mc.yandex.by", "mc.yandex.kz", "mc.yandex.com.tr",
+    "google-analytics.com", "analytics.google.com", "googletagmanager.com",
+    "doubleclick.net", "googleadservices.com", "googlesyndication.com",
+    "connect.facebook.net", "top-fwz1.mail.ru", "top.mail.ru",
+    "counter.yadro.ru", "ads.vk.com",
+)
+# General hosts that also serve real content - treated as a tracker only when
+# the path marks a tracking endpoint.
+_TRACKER_HOST_PATHS = (
+    ("yandex.ru", "/watch/"),
+    ("facebook.com", "/tr"),
+    ("vk.com", "/rtrg"),
+    ("vk.com", "/rtd"),
+    ("ok.ru", "/dk"),
+    ("google.com", "/pagead"),
+    ("google.com", "/ads"),
+)
+
+
+def _host_matches(host: str, suffix: str) -> bool:
+    return host == suffix or host.endswith("." + suffix)
+
+
+def _path_has_marker(path: str, marker: str) -> bool:
+    """Match a path marker on a segment boundary, not as a loose prefix: a short
+    marker like "/tr" (Meta Pixel) must match "/tr", "/tr/" or "/tr?…" but NOT
+    "/train/photo.jpg" or "/trends". A marker that already ends with "/" is a
+    boundary in itself."""
+    if path == marker:
+        return True
+    if not path.startswith(marker):
+        return False
+    if marker.endswith("/"):
+        return True
+    rest = path[len(marker):]
+    return rest[0] in "/?#;," if rest else True
+
+
+def _is_tracking_pixel(url: str | None) -> bool:
+    if not url:
+        return False
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if not host:
+        return False
+    for suffix in _TRACKER_HOST_SUFFIXES:
+        if _host_matches(host, suffix):
+            return True
+    path = parts.path or ""
+    for general_host, marker in _TRACKER_HOST_PATHS:
+        if _host_matches(host, general_host) and _path_has_marker(path, marker):
+            return True
+    return False
+
+
 def _parse_srcset(srcset: str) -> list[str]:
     """Extract the candidate URLs from a srcset value (the URL token of each
     comma-separated candidate, dropping the width/pixel descriptor)."""
@@ -189,8 +253,6 @@ async def _check_availability(items: list[ImageItem], ctx: ImageAuditContext) ->
 
 async def analyze_images(parser, page_url: str, ctx: ImageAuditContext | None) -> ImagesData:
     data = ImagesData()
-    records = parser.images
-    data.total = len(records)
 
     def resolve(raw: str) -> str | None:
         if not raw:
@@ -199,6 +261,11 @@ async def analyze_images(parser, page_url: str, ctx: ImageAuditContext | None) -
             return normalize_public_url(resolve_relative_url(page_url, raw))
         except HTTPException:
             return None
+
+    # Analytics/tracking pixels are not content images - drop them up front so
+    # they never enter the count, availability checks, warnings or errors.
+    records = [rec for rec in parser.images if not _is_tracking_pixel(resolve(rec["src"]))]
+    data.total = len(records)
 
     items_by_url: dict[str, ImageItem] = {}
     order: list[ImageItem] = []
@@ -248,7 +315,7 @@ async def analyze_images(parser, page_url: str, ctx: ImageAuditContext | None) -
         elif len(alt_text) > IMAGES_ALT_MAX_LENGTH:
             warnings.append(f"слишком длинный alt ({len(alt_text)} симв.)")
         if rec["width"] is None or rec["height"] is None:
-            warnings.append("не заданы атрибуты width/height")
+            warnings.append("не заданы атрибуты width/height (возможен сдвиг макета, если размеры не заданы в CSS)")
         if idx == 0 and rec["loading"] == "lazy":
             warnings.append("lazy-loading у первого изображения (возможно важное)")
         for w in warnings:
@@ -259,11 +326,17 @@ async def analyze_images(parser, page_url: str, ctx: ImageAuditContext | None) -
             item.availability_note = "нет src" if not raw else "некорректный URL изображения"
 
         for cand in _parse_srcset(rec["srcset"]):
-            add_candidate(cand, resolve(cand), "srcset")
+            cand_url = resolve(cand)
+            if cand_url and _is_tracking_pixel(cand_url):
+                continue
+            add_candidate(cand, cand_url, "srcset")
 
     for srcset in parser.picture_source_srcsets:
         for cand in _parse_srcset(srcset):
-            add_candidate(cand, resolve(cand), "srcset")
+            cand_url = resolve(cand)
+            if cand_url and _is_tracking_pixel(cand_url):
+                continue
+            add_candidate(cand, cand_url, "srcset")
 
     if len(order) > IMAGES_MAX_PER_PAGE:
         order = order[:IMAGES_MAX_PER_PAGE]

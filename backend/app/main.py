@@ -1,22 +1,46 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
+from . import stats
 from .config import APP_NAME, APP_VERSION
 from .jobs import job_manager
 from .models import AuditCreateResponse, AuditJobStatus, AuditRequest, AuditResultsResponse
 from .report import build_report_workbook, report_filename
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialise the (optional) stats DB and reconcile any runs left in a
+    # non-terminal state by a previous process, so a Docker restart can never
+    # leave audits stuck as "running" in the daily report. No-op unless
+    # HEADINSPECT_STATS_DB is set; failures never block startup.
+    try:
+        stats.init_db()
+        reconciled = stats.reconcile_running()
+        if reconciled:
+            import logging
+            logging.getLogger("uvicorn.error").info(
+                "Startup: reconciled %s interrupted audit run(s) in stats", reconciled
+            )
+    except Exception:
+        import logging
+        logging.getLogger("uvicorn.error").exception("Startup stats reconcile failed")
+    yield
+
 
 app = FastAPI(
     title=APP_NAME,
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -57,7 +81,7 @@ async def create_audit(payload: AuditRequest, request: Request) -> AuditCreateRe
     if not client_ip:
         client_ip = request.client.host if request.client else "unknown"
 
-    job = await job_manager.create(payload.url, client_ip=client_ip)
+    job = await job_manager.create(payload.url, client_ip=client_ip, source=payload.source)
     return AuditCreateResponse(
         job_id=job.job_id,
         status=job.status,

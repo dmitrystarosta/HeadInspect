@@ -11,6 +11,7 @@ import uuid
 
 from fastapi import HTTPException
 
+from . import stats
 from .analyzers.images import ImageAuditContext
 from .audit import ACCESS_BLOCKED_STATUS_CODES, discover_audit_urls, run_pages
 from .canonical_resolve import resolve_canonicals
@@ -130,6 +131,7 @@ class Job:
     job_id: str
     requested_url: str
     client_ip: str = "unknown"
+    source: str | None = None
     status: JobStatus = "queued"
     normalized_url: str | None = None
     robots_url: str | None = None
@@ -181,7 +183,7 @@ class JobManager:
             return None
         return urlsplit(normalized).hostname
 
-    async def create(self, requested_url: str, *, client_ip: str) -> Job:
+    async def create(self, requested_url: str, *, client_ip: str, source: str | None = None) -> Job:
         await self.cleanup()
 
         async with self._create_lock:
@@ -286,10 +288,19 @@ class JobManager:
             attempts.append(now)
             if site_key is not None:
                 self._domain_cooldowns[site_key] = now
-            job = Job(job_id=uuid.uuid4().hex, requested_url=requested_url, client_ip=client_ip)
+            job = Job(
+                job_id=uuid.uuid4().hex,
+                requested_url=requested_url,
+                client_ip=client_ip,
+                source=source,
+            )
             self.jobs[job.job_id] = job
 
         logger.info("Audit %s queued: ip=%s url=%s", job.job_id, client_ip, requested_url)
+        # Record minimal, non-personal run metadata for the daily report (no-op
+        # unless HEADINSPECT_STATS_DB is set). Off the event loop so it never
+        # delays the audit; failures are swallowed inside stats.
+        await asyncio.to_thread(stats.record_created, job.job_id, site_key, source, job.created_at)
         asyncio.create_task(self._run(job))
         return job
 
@@ -519,6 +530,10 @@ class JobManager:
                     job.access_blocked_status = access_blocked_status
                     job.status = "running"
 
+                # In-progress runs appear in the daily report with a live
+                # status, so record the transition to "running" too.
+                await asyncio.to_thread(stats.record_status, job.job_id, "running", job.started_at)
+
                 if access_blocked_status is not None:
                     logger.warning(
                         "Audit %s stopped at entry URL: HTTP %s blocks automated access, ip=%s url=%s",
@@ -637,6 +652,9 @@ class JobManager:
                     job.status = "failed"
                     job.error = "Audit failed"
                     job.completed_at = utcnow()
+            finally:
+                # Final status for the daily report (no-op unless stats enabled).
+                await asyncio.to_thread(stats.record_status, job.job_id, job.status, job.started_at)
 
     @staticmethod
     def _apply_meta_duplicate_warnings(results: list[PageResult]) -> None:

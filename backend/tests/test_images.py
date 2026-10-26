@@ -184,6 +184,59 @@ async def test_ctx_none_does_markup_only_no_network(monkeypatch):
     assert "нет атрибута alt" in data.items[0].warnings
 
 
+async def test_tracking_pixels_are_excluded(monkeypatch):
+    calls = []
+    install_fake_head(monkeypatch, {}, calls=calls)
+    html = (
+        '<img src="https://mc.yandex.ru/watch/22315550">'          # Яндекс.Метрика
+        '<img src="//mc.yandex.ru/watch/999">'                     # protocol-relative
+        '<img src="https://www.google-analytics.com/collect?v=1">' # GA
+        '<img src="https://www.facebook.com/tr?id=1&ev=PageView">' # Meta Pixel (host+path)
+        '<img src="https://yandex.ru/watch/7">'                    # Metrica via path
+        '<img src="https://cdn.example.com/real-1x1.gif" width="1" height="1" alt="">'  # real, small
+        '<img src="/photo.png" alt="Фото" width="10" height="10">'
+    )
+    data = await analyze_images(parse(html), "https://site.ru/", ImageAuditContext())
+    srcs = [it.src or "" for it in data.items]
+    # Only the two genuine images are counted.
+    assert data.total == 2
+    assert not any(("yandex" in s or "google-analytics" in s or "facebook.com" in s) for s in srcs)
+    # A small, empty-alt, third-party image is NOT a tracker and stays.
+    assert "https://cdn.example.com/real-1x1.gif" in srcs
+    # Trackers are never even HEAD-checked.
+    assert not any(("yandex" in u or "google-analytics" in u or "facebook" in u) for u, _ in calls)
+
+
+async def test_tracker_path_markers_match_on_boundary(monkeypatch):
+    # Short path markers (/tr, /ads, /dk, …) must match a real endpoint, not
+    # any URL that merely starts with those characters.
+    install_fake_head(monkeypatch, {})
+    html = (
+        '<img src="https://www.facebook.com/tr?id=1" >'                 # real Meta Pixel -> excluded
+        '<img src="https://www.facebook.com/train/loco.jpg" alt="поезд" width="2" height="2">'  # NOT a tracker
+        '<img src="https://vk.com/rtrending/x.png" alt="vk" width="2" height="2">'  # NOT /rtrg
+        '<img src="https://www.google.com/adsense-banner.png" alt="g" width="2" height="2">'  # NOT /ads boundary
+    )
+    data = await analyze_images(parse(html), "https://site.ru/", ImageAuditContext())
+    srcs = [it.src or "" for it in data.items]
+    assert not any("facebook.com/tr?" in s or s.endswith("facebook.com/tr") for s in srcs)
+    assert any("facebook.com/train/loco.jpg" in s for s in srcs)
+    assert any("vk.com/rtrending/x.png" in s for s in srcs)
+    assert any("google.com/adsense-banner.png" in s for s in srcs)
+    assert data.total == 3  # the three real images, pixel excluded
+
+
+async def test_srcset_variant_has_no_alt_warning(monkeypatch):
+    install_fake_head(monkeypatch, {})
+    html = '<img src="/main.png" srcset="/main-2x.png 2x" alt="Главное" width="1" height="1">'
+    data = await analyze_images(parse(html), "https://site.ru/", ImageAuditContext())
+    variant = next(it for it in data.items if (it.src or "").endswith("main-2x.png"))
+    assert variant.source == "srcset"
+    assert not variant.has_alt
+    assert variant.warnings == []  # a srcset candidate carries no alt of its own
+    assert not any("main-2x.png" in w and "alt" in w for w in data.warnings)
+
+
 async def test_aggregate_errors_and_warnings(monkeypatch):
     install_fake_head(monkeypatch, {"https://site.ru/gone.png": (404, {})})
     html = '<img src="/gone.png"><img src="/ok.png" alt="x" width="1" height="1">'

@@ -266,6 +266,10 @@ def _format_bytes(size: int | None) -> str:
 
 
 def _alt_label(item) -> str:
+    # alt belongs to the <img> element, not to each srcset candidate URL, so a
+    # srcset variant legitimately has no alt of its own - never shown as "нет".
+    if item.source == "srcset":
+        return "—"
     if not item.has_alt:
         return "нет"
     if item.alt_empty:
@@ -273,32 +277,48 @@ def _alt_label(item) -> str:
     return item.alt or ""
 
 
+def _availability_label(item) -> str:
+    """Human availability status, distinguishing a confirmed HTTP error from an
+    image that simply was not checked (caps/time) or could not be determined."""
+    if item.accessible is True:
+        return "доступно"
+    if item.accessible is False:
+        return f"недоступно (HTTP {item.status_code})" if item.status_code else "недоступно"
+    if not item.checked:
+        return "не проверено"
+    return "не удалось определить"
+
+
 def _sheet_images(ws: Worksheet, content_pages: list[PageResult]) -> None:
-    header = ["Страница", "URL изображения", "Источник", "alt", "Размеры (W×H)",
-              "loading", "Формат", "HTTP", "Вес", "Повтор (стр.)", "Проблемы"]
+    header = ["Страница", "URL изображения", "Источник", "alt (у <img>)", "Размеры (W×H)",
+              "loading", "Формат", "Доступность", "HTTP", "Вес", "Повтор (стр.)", "Проблемы"]
     rows = []
     for page in content_pages:
         if page.check_failed:
             continue
         for item in page.images.items:
             dims = f"{item.width_attr}×{item.height_attr}" if (item.width_attr and item.height_attr) else "—"
+            # The availability note (reason) is folded into the status label /
+            # issues column, so don't double it as an error.
             issues = list(item.errors) + list(item.warnings)
-            if item.availability_note:
+            if item.availability_note and item.accessible is None:
                 issues.append(item.availability_note)
+            source_label = "srcset-вариант" if item.source == "srcset" else "img"
             rows.append([
                 _or_dash(page.url),
                 _or_dash(item.src or item.raw_src),
-                item.source,
+                source_label,
                 _alt_label(item),
                 dims,
                 _or_dash(item.loading),
                 _or_dash(item.format_guess),
+                _availability_label(item),
                 str(item.status_code) if item.status_code is not None else "—",
                 _format_bytes(item.bytes),
                 item.reuse_count,
                 _join_issues(issues),
             ])
-    _write_rows(ws, header, rows, [40, 46, 9, 24, 14, 10, 10, 7, 10, 12, 44])
+    _write_rows(ws, header, rows, [38, 44, 14, 20, 13, 9, 9, 18, 6, 9, 11, 42])
 
 
 def _sheet_sitemap(ws: Worksheet, results: list[PageResult]) -> None:

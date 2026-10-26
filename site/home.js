@@ -399,9 +399,9 @@ $$('.audit-module.active .audit-module-head').forEach(moduleButton => {
     if (!body) return;
     const open = !body.hidden;
     body.hidden = open;
+    // Chevron direction is driven by aria-expanded in CSS (see styles.css),
+    // so the SVG stays in place and only rotates - no glyph swapping here.
     moduleButton.setAttribute("aria-expanded", String(!open));
-    const arrow = $(".module-arrow", moduleButton);
-    if (arrow) arrow.textContent = open ? "⌄" : "⌃";
   });
 });
 

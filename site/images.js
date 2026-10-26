@@ -51,31 +51,39 @@ function sizeLabel(bytes) {
 
 // Build the availability "code" + a compact markup hint for one image.
 function imageLine(item) {
-  const state = (item.errors && item.errors.length) ? "bad"
-    : (item.warnings && item.warnings.length) ? "warn" : "ok";
+  // A confirmed HTTP error is red; markup recommendations are yellow; a
+  // checked-and-available image is green; an image that was NOT checked (caps/
+  // time) or could not be determined is neutral - never shown as a problem.
+  let state;
+  if (item.errors && item.errors.length) state = "bad";
+  else if (item.warnings && item.warnings.length) state = "warn";
+  else if (item.accessible === true) state = "ok";
+  else state = "muted";
 
   let code;
   if (item.accessible === false) {
     code = item.status_code ? `HTTP ${item.status_code}` : "недоступно";
-  } else if (item.checked && item.status_code) {
+  } else if (item.accessible === true) {
     code = `HTTP ${item.status_code}`;
     const size = sizeLabel(item.bytes);
     if (size) code += ` · ${size}`;
-  } else if (item.availability_note) {
-    code = item.availability_note;
+  } else if (!item.checked) {
+    // Show the actual reason (time budget / per-audit limit / …), which the
+    // backend already phrases as "не проверено: …".
+    code = item.availability_note || "не проверено";
   } else {
-    code = "—";
+    code = item.availability_note || "не удалось определить";
   }
 
   const parts = [];
-  if (!item.has_alt) parts.push("нет alt");
-  else if (item.alt_empty) parts.push("alt=\"\" (декоративное)");
-  else parts.push("alt есть");
-
+  // alt belongs to the <img>, not to srcset candidate URLs.
   if (item.source === "img") {
+    if (!item.has_alt) parts.push("нет alt");
+    else if (item.alt_empty) parts.push("alt=\"\" (декоративное)");
+    else parts.push("alt есть");
     parts.push((item.width_attr && item.height_attr) ? `${item.width_attr}×${item.height_attr}` : "нет width/height");
   } else {
-    parts.push("srcset");
+    parts.push("вариант srcset");
   }
 
   if (item.format_guess) parts.push(item.format_guess);
@@ -272,7 +280,7 @@ function renderRows() {
         <span class="result-dot" aria-hidden="true"></span>
         <span class="result-path">${escapeHtml(row.path)}</span>
         <span class="result-message">${escapeHtml(row.message)}</span>
-        <span class="result-chevron" aria-hidden="true">⌄</span>
+        <span class="result-chevron" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       </button>
       <div class="result-item-detail" hidden></div>
     `;

@@ -211,17 +211,34 @@ def test_images_sheet_and_problems_rows():
             ImageItem(src="https://example.ru/gone.png", source="img", has_alt=False,
                       checked=True, accessible=False, status_code=404,
                       errors=["HTTP 404"], warnings=["нет атрибута alt"]),
+            ImageItem(src="https://example.ru/main-2x.png", source="srcset",
+                      has_alt=False, checked=True, accessible=True, status_code=200),
+            ImageItem(src="https://example.ru/skipped.png", source="img",
+                      has_alt=True, alt="x", checked=False,
+                      availability_note="не проверено: превышен лимит проверок изображений за аудит"),
         ],
-        total=2, checked_count=2,
+        total=4, checked_count=3,
         errors=["https://example.ru/gone.png: HTTP 404"],
         warnings=["https://example.ru/gone.png: нет атрибута alt"],
     )
     wb = _load(job)
     img = wb["Images"]
     header = [c.value for c in img[1]]
-    assert header[:4] == ["Страница", "URL изображения", "Источник", "alt"]
-    # Two image rows + header.
-    assert img.max_row == 3
+    assert header[:4] == ["Страница", "URL изображения", "Источник", "alt (у <img>)"]
+    assert "Доступность" in header
+    # Four image rows + header.
+    assert img.max_row == 5
+    data_rows = list(img.iter_rows(min_row=2, values_only=True))
+    avail_col = header.index("Доступность")
+    alt_col = header.index("alt (у <img>)")
+    by_url = {r[1]: r for r in data_rows}
+    # srcset variant: alt shown as "—", not "нет".
+    assert by_url["https://example.ru/main-2x.png"][alt_col] == "—"
+    # confirmed broken vs not-checked are distinct availability labels.
+    assert "HTTP 404" in by_url["https://example.ru/gone.png"][avail_col]
+    assert by_url["https://example.ru/skipped.png"][avail_col] == "не проверено"
+    assert by_url["https://example.ru/ok.png"][avail_col] == "доступно"
+
     problems = [tuple(r) for r in wb["Проблемы"].iter_rows(values_only=True)]
     assert any(p[1] == "Images" and "HTTP 404" in p[3] for p in problems)
     assert any(p[1] == "Images" and "alt" in p[3] for p in problems)

@@ -628,6 +628,66 @@ img { max-width: 100%; }
 }
 .result-item.open .result-chevron { transform: rotate(180deg); }
 
+/* Inline SVG chevrons (result rows and general-audit module heads). The
+   chevron points down when collapsed and rotates 180° (points up) when the
+   row/module is expanded. Direction is driven entirely by existing state
+   (.result-item.open above, and aria-expanded on the module head) — the
+   expand/collapse logic itself is unchanged. */
+.result-chevron svg,
+.module-arrow svg { display: block; }
+.module-arrow { transition: transform .18s ease; }
+.audit-module-head[aria-expanded="true"] .module-arrow { transform: rotate(180deg); }
+
+/* Neutral hint colour for "не проверено"/inconclusive image availability -
+   distinct from ok (green) / warn / bad (red). */
+.length-hint.muted { color: var(--muted); }
+
+/* Images result rows reuse .meta-item, but their left cell is a possibly very
+   long image URL (long paths, srcset variants, data-less SVG names). The Meta
+   page's fixed "155px 1fr" grid would let that URL overflow and overlap the
+   right-hand characteristics, so the Images list switches to a wrapping flex
+   row: the URL wraps inside its own cell (min-width:0 + overflow-wrap) and the
+   HTTP status / size / SEO characteristics stay readable, dropping onto their
+   own line under the URL when space is tight. Scoped to .images-list so the
+   Meta layout is untouched. Nothing is clipped or ellipsised. */
+.images-list .meta-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 16px;
+  row-gap: 2px;
+  grid-template-columns: none;
+}
+/* The URL cell keeps a sensible minimum width (~14rem, but never wider than
+   the row itself via min()), so it is never squeezed down to a 1-character
+   column — which is what caused the character-per-line breakage in a narrow
+   results column. When the characteristics no longer fit beside it, flex-wrap
+   drops them onto their own line UNDER the URL. This responds to the actual
+   container width, not the viewport, so it is correct even when the window is
+   wide but the results column is narrow. */
+.images-list .meta-item > span {
+  flex: 1 1 16rem;
+  min-width: min(100%, 14rem);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.images-list .meta-item > span a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.images-list .meta-value {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;   /* keep the characteristics at the right edge beside the URL */
+  text-align: right;
+}
+.images-list .meta-value code,
+.images-list .length-hint { overflow-wrap: anywhere; }
+/* On a genuinely small viewport, stack and left-align for the most natural read. */
+@media (max-width: 640px) {
+  .images-list .meta-value { flex-basis: 100%; margin-left: 0; text-align: left; }
+}
+
 .result-item-detail {
   border-top: 1px solid rgba(148,163,184,.24);
   background: #fff;
