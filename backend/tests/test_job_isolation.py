@@ -38,7 +38,7 @@ async def test_sequential_jobs_do_not_share_any_state(monkeypatch):
             "access_blocked_status": None,
         }
 
-    async def run_pages_a(urls, on_result, *, stop_event=None):
+    async def run_pages_a(urls, on_result, *, stop_event=None, image_ctx=None):
         for i, u in enumerate(urls[:30]):
             await on_result(PageResult(url=u, requested_url=u, status_code=200))
         for i, u in enumerate(urls[30:42]):
@@ -91,7 +91,7 @@ async def test_sequential_jobs_do_not_share_any_state(monkeypatch):
             "access_blocked_status": None,
         }
 
-    async def run_pages_b(urls, on_result, *, stop_event=None):
+    async def run_pages_b(urls, on_result, *, stop_event=None, image_ctx=None):
         for u in urls:
             await on_result(PageResult(url=u, requested_url=u, status_code=200))
 
@@ -194,7 +194,7 @@ async def test_check_reason_does_not_leak_between_sequential_jobs(monkeypatch):
             "urls": urls_a, "limited": False, "access_blocked_status": None,
         }
 
-    async def run_pages_a(urls, on_result, *, stop_event=None):
+    async def run_pages_a(urls, on_result, *, stop_event=None, image_ctx=None):
         for i, u in enumerate(urls):
             if i < 5:
                 await on_result(PageResult(url=u, requested_url=u, status_code=200))
@@ -230,7 +230,7 @@ async def test_check_reason_does_not_leak_between_sequential_jobs(monkeypatch):
             "urls": urls_b, "limited": False, "access_blocked_status": None,
         }
 
-    async def run_pages_b(urls, on_result, *, stop_event=None):
+    async def run_pages_b(urls, on_result, *, stop_event=None, image_ctx=None):
         for u in urls:
             await on_result(PageResult(url=u, requested_url=u, status_code=200))
 

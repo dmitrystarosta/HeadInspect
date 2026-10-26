@@ -11,6 +11,7 @@ import uuid
 
 from fastapi import HTTPException
 
+from .analyzers.images import ImageAuditContext
 from .audit import ACCESS_BLOCKED_STATUS_CODES, discover_audit_urls, run_pages
 from .canonical_resolve import resolve_canonicals
 from .config import (
@@ -370,6 +371,7 @@ class JobManager:
         urls: list[str],
         stop_event: asyncio.Event,
         deadline_seconds: float,
+        image_ctx: ImageAuditContext | None = None,
     ) -> str:
         """Run the page crawl under two independent bounds and return why it
         ended: "completed" (every page attempted), "deadline" (the work-scaled
@@ -410,7 +412,9 @@ class JobManager:
                 last_progress = monotonic()
             await base_on_result(result)
 
-        crawl = asyncio.ensure_future(run_pages(urls, on_result, stop_event=stop_event))
+        crawl = asyncio.ensure_future(
+            run_pages(urls, on_result, stop_event=stop_event, image_ctx=image_ctx)
+        )
         deadline_at = monotonic() + deadline_seconds
         outcome = "completed"
         try:
@@ -533,7 +537,8 @@ class JobManager:
                 # any in-flight workers on stop (see _supervised_crawl). ----
                 stop_event = asyncio.Event()
                 crawl_deadline = crawl_deadline_seconds(len(urls))
-                outcome = await self._supervised_crawl(job, urls, stop_event, crawl_deadline)
+                image_ctx = ImageAuditContext()
+                outcome = await self._supervised_crawl(job, urls, stop_event, crawl_deadline, image_ctx)
 
                 # Cross-page passes over whatever we collected. Both cover the
                 # full-completion and the stopped-early (deadline/stall/blocked)
@@ -541,6 +546,7 @@ class JobManager:
                 # network, and a target missing from a partial map is simply
                 # "not checked", never an error.
                 self._apply_meta_duplicate_warnings(job.results)
+                self._apply_image_reuse(job.results)
                 resolve_canonicals(job.results)
 
                 async with job.lock:
@@ -666,6 +672,25 @@ class JobManager:
                 for result in matches:
                     if warning not in result.meta.warnings:
                         result.meta.warnings.append(warning)
+
+    @staticmethod
+    def _apply_image_reuse(results: list[PageResult]) -> None:
+        """Count, per image URL, on how many audited pages it appears, and
+        record it on each image item (informational - reuse of the same image
+        across pages is normal, e.g. logos). Synchronous, no network."""
+        pages_by_url: dict[str, set[str]] = {}
+        for result in results:
+            page_key = result.url or result.requested_url or ""
+            seen: set[str] = set()
+            for item in result.images.items:
+                if item.src and item.src not in seen:
+                    seen.add(item.src)
+                    pages_by_url.setdefault(item.src, set()).add(page_key)
+
+        for result in results:
+            for item in result.images.items:
+                if item.src:
+                    item.reuse_count = len(pages_by_url.get(item.src, {""}))
 
     def status_model(self, job: Job) -> AuditJobStatus:
         total = job.discovered_urls

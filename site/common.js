@@ -497,6 +497,64 @@
     });
   }
 
+  // --- Excel report download ------------------------------------------------
+  // Shared by the home page and every module page so the "Скачать Excel"
+  // button has one implementation instead of six. The report is built by the
+  // backend (GET /api/audits/{jobId}/report.xlsx); here we just fetch it as a
+  // blob and hand the browser a download with the server-provided filename.
+  // Uses raw fetch (not apiFetch) because the success body is binary, not
+  // JSON; an error response still carries the backend's JSON {detail}.
+  function filenameFromDisposition(header) {
+    if (!header) return null;
+    // Prefer the RFC 5987 extended form (filename*=UTF-8''...) so a non-ASCII
+    // hostname survives; fall back to a plain quoted filename.
+    const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+    if (star) {
+      try { return decodeURIComponent(star[1]); } catch { /* fall through */ }
+    }
+    const plain = /filename="?([^";]+)"?/i.exec(header);
+    return plain ? plain[1] : null;
+  }
+
+  async function downloadReport(jobId, { button } = {}) {
+    if (!jobId) return;
+
+    const label = button ? button.textContent : null;
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Готовим Excel…";
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/audits/${jobId}/report.xlsx`);
+      if (!response.ok) {
+        let detail = null;
+        try { const data = await response.json(); detail = data && data.detail; } catch { /* no JSON */ }
+        throw new ApiError(detail || `Не удалось сформировать файл (${response.status})`, { status: response.status });
+      }
+
+      const blob = await response.blob();
+      const filename = filenameFromDisposition(response.headers.get("Content-Disposition")) || "headinspect-report.xlsx";
+
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      if (document.body && document.body.appendChild) document.body.appendChild(link);
+      link.click();
+      if (link.remove) link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      const message = describeError(error, "Не удалось сформировать Excel. Попробуйте позже.");
+      if (message) alert(message);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = label;
+      }
+    }
+  }
+
   // --- Shared polling loop --------------------------------------------------
   // Polls /api/audits/{jobId} until it reaches a terminal state. Calls
   // onStatus(status) on every poll (for progress/step UI). Resolves with the
@@ -550,6 +608,8 @@
     describeCheckReason,
     uniqueContentPages,
     sortRowsForDisplay,
-    pollJobUntilDone
+    pollJobUntilDone,
+    downloadReport,
+    filenameFromDisposition
   };
 })(window);

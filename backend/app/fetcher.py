@@ -58,7 +58,13 @@ async def safe_fetch(
     max_bytes: int,
     accepted_content_types: tuple[str, ...] | None = None,
     request_headers: dict[str, str] | None = None,
+    method: str = "GET",
 ) -> FetchResult:
+    # `method` is additive: GET keeps the exact previous behaviour; "HEAD" is
+    # used by the Images module to check availability (status / Content-Type /
+    # Content-Length) without downloading any body. The whole SSRF/DNS-pinning
+    # path below is identical for both - only the HTTP method on the pinned
+    # request changes, and a HEAD simply returns an empty body.
     current = normalize_public_url(url)
 
     headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
@@ -111,7 +117,7 @@ async def safe_fetch(
 
                 try:
                     request = client.build_request(
-                        "GET",
+                        method,
                         pinned_url,
                         headers=per_request_headers,
                         extensions=extensions,

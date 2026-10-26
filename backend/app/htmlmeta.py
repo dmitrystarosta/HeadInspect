@@ -35,6 +35,15 @@ class MetadataParser(HTMLParser):
         self.json_ld_blocks: list[str] = []
         self.microdata_types: list[str] = []
 
+        # One record per <img> in document order, plus any <source srcset>
+        # inside <picture>. Raw markup only - resolution, availability and all
+        # SEO judgement happen later in the images analyzer, never here. `alt`
+        # is None when the attribute is absent and "" when present-but-empty,
+        # so a decorative image can be told apart from a forgotten alt.
+        self.images: list[dict] = []
+        self.picture_source_srcsets: list[str] = []
+        self._picture_depth = 0
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
         data = {k.lower(): (v or "") for k, v in attrs}
@@ -48,6 +57,31 @@ class MetadataParser(HTMLParser):
             itemtype = data.get("itemtype", "").strip()
             if itemtype:
                 self.microdata_types.append(itemtype)
+
+        if tag == "picture":
+            self._picture_depth += 1
+            return
+
+        if tag == "source":
+            # <source srcset> inside <picture> contributes candidate image
+            # URLs (for availability + cross-page reuse); it carries no alt.
+            if self._picture_depth > 0:
+                srcset = data.get("srcset", "").strip()
+                if srcset:
+                    self.picture_source_srcsets.append(srcset)
+            return
+
+        if tag == "img":
+            self.images.append({
+                "src": data.get("src", "").strip(),
+                "srcset": data.get("srcset", "").strip(),
+                # None => attribute absent; "" => present but empty (decorative).
+                "alt": data["alt"] if "alt" in data else None,
+                "width": data.get("width", "").strip() or None,
+                "height": data.get("height", "").strip() or None,
+                "loading": data.get("loading", "").strip().lower() or None,
+            })
+            return
 
         if tag == "html" and self.html_lang is None:
             self.html_lang = data.get("lang", "").strip() or None
@@ -109,6 +143,10 @@ class MetadataParser(HTMLParser):
             self.json_ld_blocks.append("".join(self.current_json_ld_parts).strip())
             self.in_json_ld = False
             self.current_json_ld_parts = []
+            return
+
+        if tag == "picture" and self._picture_depth > 0:
+            self._picture_depth -= 1
             return
 
         if tag != "title":

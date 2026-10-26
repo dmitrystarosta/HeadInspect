@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+import asyncio
+from urllib.parse import quote
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
 from .config import APP_NAME, APP_VERSION
 from .jobs import job_manager
 from .models import AuditCreateResponse, AuditJobStatus, AuditRequest, AuditResultsResponse
+from .report import build_report_workbook, report_filename
 
 app = FastAPI(
     title=APP_NAME,
@@ -23,7 +28,16 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
+    # Let the browser read the download filename on the cross-origin
+    # report.xlsx response (frontend fetches it as a blob).
+    expose_headers=["Content-Disposition"],
 )
+
+XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# Statuses for which a report is not yet meaningful - the crawl has not
+# produced a result set to export. completed / completed_partial pass.
+_UNFINISHED_STATUSES = frozenset({"queued", "discovering", "running"})
 
 
 @app.get("/health")
@@ -62,3 +76,27 @@ async def audit_status(job_id: str) -> AuditJobStatus:
 async def audit_results(job_id: str) -> AuditResultsResponse:
     job = job_manager.get(job_id)
     return job_manager.results_model(job)
+
+
+@app.get("/api/audits/{job_id}/report.xlsx")
+async def audit_report(job_id: str) -> Response:
+    job = job_manager.get(job_id)
+    if job.status in _UNFINISHED_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="Проверка ещё не завершена. Дождитесь окончания аудита и повторите скачивание.",
+        )
+
+    # Building a 500-page workbook with openpyxl is CPU-bound (~0.3 s), enough
+    # to stall the single event loop and every other in-flight audit. Offload
+    # it to a worker thread so the API stays responsive; the job is only read,
+    # never mutated, so this is safe.
+    content = await asyncio.to_thread(build_report_workbook, job)
+    filename = report_filename(job)
+    # RFC 5987 encoding so a non-ASCII hostname in the filename survives.
+    disposition = f"attachment; filename=\"report.xlsx\"; filename*=UTF-8''{quote(filename)}"
+    return Response(
+        content=content,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": disposition},
+    )

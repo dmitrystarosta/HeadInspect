@@ -438,8 +438,8 @@ $("#restart-btn")?.addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
-$("#download-btn")?.addEventListener("click", () => {
-  alert("Экспорт Excel для Schema подключим отдельным этапом. Сам Schema-аудит уже работает в реальном режиме.");
+$("#download-btn")?.addEventListener("click", event => {
+  HI.downloadReport(currentJobId, { button: event.currentTarget });
 });
 
 // FAQ accordion: keep at most one answer open at a time.

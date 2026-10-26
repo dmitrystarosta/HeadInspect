@@ -159,7 +159,7 @@ async def _run_job(monkeypatch, discovery):
     async def discover(url):
         return discovery
 
-    async def run_pages(urls, on_result, *, stop_event=None):
+    async def run_pages(urls, on_result, *, stop_event=None, image_ctx=None):
         for u in urls:
             await on_result(PageResult(url=u, requested_url=u, status_code=200))
 

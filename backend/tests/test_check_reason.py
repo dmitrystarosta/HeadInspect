@@ -128,7 +128,7 @@ async def test_page_timeout_wrapper_sets_timeout_reason(monkeypatch):
     _fetch_and_analyze (the inner work function PAGE_TIMEOUT now wraps),
     not analyze_page itself - analyze_page is real here, exercising its own
     wait_for/semaphore logic end to end."""
-    async def hang_forever(url):
+    async def hang_forever(url, image_ctx=None):
         await asyncio.sleep(10)
 
     monkeypatch.setattr(audit_module, "_fetch_and_analyze", hang_forever)

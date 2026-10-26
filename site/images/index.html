@@ -1,18 +1,405 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Проверка изображений всего сайта — HeadInspect</title><meta name="description" content="Проверка изображений на страницах: доступность, вес, размеры, формат, alt и повторяющиеся файлы."><meta name="robots" content="noindex,follow"><meta name="theme-color" content="#0f172a"><link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Проверка изображений всего сайта — HeadInspect</title>
+  <meta name="description" content="Проверьте изображения сразу на всех страницах сайта: alt, width/height, lazy-loading, srcset, доступность по HTTP, Content-Type и вес по заголовкам.">
+  <meta name="keywords" content="проверка изображений сайта, alt изображений, width height img, lazy loading, srcset, доступность изображений, SEO аудит изображений, массовая проверка сайта">
+  <meta name="theme-color" content="#0f172a">
+  <meta property="og:title" content="Проверка изображений всего сайта — HeadInspect">
+  <meta property="og:description" content="Проверьте alt, размеры, lazy-loading, srcset и доступность изображений сразу на всех страницах сайта.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://headinspect.ru/images/">
+  <meta property="og:site_name" content="HeadInspect">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:image" content="https://headinspect.ru/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:alt" content="HeadInspect — массовая техническая проверка сайта">
+  <link rel="canonical" href="https://headinspect.ru/images/">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="stylesheet" href="../styles.css"></head><body>
-<header class="site-header"><div class="shell header-inner"><a class="brand" href="/"><img class="brand-logo" src="../headinspect-logo-36.webp" srcset="../headinspect-logo-36.webp 1x, ../headinspect-logo-72.webp 2x" width="36" height="36" alt=""><span>HeadInspect</span></a><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"><span class="sr-only">Открыть меню</span><span></span><span></span><span></span></button><nav id="main-nav" class="main-nav tools-nav" aria-label="Инструменты HeadInspect">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://headinspect.ru/#website",
+      "url": "https://headinspect.ru/",
+      "name": "HeadInspect",
+      "inLanguage": "ru-RU",
+      "description": "HeadInspect — бесплатный сервис массовой технической проверки страниц сайта.",
+      "sameAs": [
+        "https://vk.ru/headinspect",
+        "https://t.me/headinspect"
+      ],
+      "publisher": {
+        "@id": "https://headinspect.ru/#creator"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://headinspect.ru/#creator",
+      "name": "Dmitry Starosta",
+      "url": "https://dmitrystarosta.github.io/projects/"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://headinspect.ru/images/#webpage",
+      "url": "https://headinspect.ru/images/",
+      "name": "Проверка изображений всего сайта — HeadInspect",
+      "description": "Массовая проверка alt, размеров, lazy-loading, srcset и доступности изображений на страницах сайта.",
+      "inLanguage": "ru-RU",
+      "isPartOf": {
+        "@id": "https://headinspect.ru/#website"
+      },
+      "mainEntity": {
+        "@id": "https://headinspect.ru/images/#app"
+      }
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://headinspect.ru/images/#app",
+      "name": "Проверка изображений всего сайта",
+      "url": "https://headinspect.ru/images/",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Любая ОС с современным веб-браузером",
+      "inLanguage": "ru-RU",
+      "description": "Проверяет alt, атрибуты width/height, lazy-loading, srcset/<picture> и доступность изображений (HTTP-статус, Content-Type, вес по заголовкам) на страницах сайта.",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "RUB"
+      },
+      "creator": {
+        "@id": "https://headinspect.ru/#creator"
+      },
+      "isPartOf": {
+        "@id": "https://headinspect.ru/#website"
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="/" aria-label="HeadInspect — на главную">
+        <img class="brand-logo" src="../headinspect-logo-36.webp" srcset="../headinspect-logo-36.webp 1x, ../headinspect-logo-72.webp 2x" width="36" height="36" alt="" aria-hidden="true">
+        <span>HeadInspect</span>
+      </a>
+
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav">
+        <span class="sr-only">Открыть меню</span>
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav id="main-nav" class="main-nav tools-nav" aria-label="Инструменты HeadInspect">
         <a href="/open-graph/">Open Graph</a>
         <a href="/meta/">Meta</a>
         <a href="/canonical/">Canonical</a>
         <a href="/schema/">Schema</a>
-        <a href="/images/">Images <span class="nav-soon">скоро</span></a>
+        <a href="/images/">Images</a>
         <a href="/sitemap/">Sitemap</a>
-      </nav></div></header>
-<main id="top"><section class="hero placeholder-hero"><div class="shell placeholder-hero-inner"><div class="eyebrow">IMAGES · SITE-WIDE AUDIT</div><div class="tool-badge big">Скоро</div><h1>Проверка изображений всего сайта</h1><p class="hero-lead">Проверка изображений на страницах: доступность, вес, размеры, формат, alt и повторяющиеся файлы.</p><div class="coming-form"><div class="url-field disabled"><span class="url-icon">⌁</span><input type="url" placeholder="https://example.ru" disabled><button class="primary-btn" type="button" disabled>Проверить сайт</button></div><p>Модуль ещё не запущен. Когда он появится, здесь будет работать тот же массовый аудит до 500 страниц.</p></div><div class="placeholder-actions"><a class="primary-btn link-btn" href="/open-graph/">Проверить Open Graph</a><a class="primary-btn link-btn" href="/meta/">Проверить Meta</a><a class="ghost-btn link-btn" href="/">Все инструменты</a></div></div></section>
-<section class="content-section"><div class="shell"><div class="section-intro"><div class="section-kicker">ЧТО БУДЕТ ПРОВЕРЯТЬСЯ</div><h2>Изображения страниц <span>на всём сайте.</span></h2><p>Страница уже занимает своё место в архитектуре HeadInspect. После запуска здесь появится специализированный результат, а модуль войдёт и в общий аудит на главной.</p></div><div class="feature-grid"><article class="feature-card"><span class="feature-num">01</span><h3>недоступные изображения</h3><p>недоступные изображения</p></article><article class="feature-card"><span class="feature-num">02</span><h3>реальные размеры</h3><p>реальные размеры</p></article><article class="feature-card"><span class="feature-num">03</span><h3>вес файлов</h3><p>вес файлов</p></article><article class="feature-card"><span class="feature-num">04</span><h3>форматы</h3><p>форматы</p></article><article class="feature-card"><span class="feature-num">05</span><h3>alt</h3><p>alt</p></article><article class="feature-card"><span class="feature-num">06</span><h3>повторяющиеся изображения</h3><p>повторяющиеся изображения</p></article></div></div></section>
-<section class="cross-tools"><div class="shell cross-tools-inner"><div><strong>Уже работают Open Graph и Meta</strong><span>Оба модуля можно запускать отдельно или вместе из общего аудита сайта.</span></div><div class="cross-tool-links"><a href="/open-graph/">Open Graph →</a><a href="/meta/">Meta →</a></div></div></section>
-</main><footer class="site-footer" id="site-footer"></footer><script src="/footer.js"></script><script src="../shell.js"></script><script src="/consent.js"></script>
-</body></html>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">МАССОВАЯ ПРОВЕРКА ИЗОБРАЖЕНИЙ</div>
+          <h1>Проверьте изображения <span>всего сайта</span></h1>
+          <p class="hero-lead">
+            Введите адрес сайта один раз. HeadInspect найдёт sitemap, разберёт разметку изображений
+            на страницах и проверит доступность картинок — alt, размеры, lazy-loading, srcset и HTTP-ответы.
+          </p>
+
+          <form id="audit-form" class="audit-form" novalidate>
+            <label class="sr-only" for="site-url">Адрес сайта</label>
+            <div class="url-field">
+              <span class="url-icon" aria-hidden="true">⌁</span>
+              <input id="site-url" name="site-url" type="url" inputmode="url"
+                     autocomplete="url" placeholder="https://example.ru" required>
+              <button class="primary-btn" type="submit">Проверить сайт</button>
+            </div>
+            <p id="form-error" class="form-error" role="alert" hidden></p>
+          </form>
+
+          <div class="hero-meta">
+            <span>✓ Бесплатно</span>
+            <span>✓ Без регистрации</span>
+            <span>✓ До 500 страниц</span>
+          </div>
+        </div>
+
+        <aside class="hero-panel meta-hero-panel" aria-label="Пример результата аудита изображений">
+          <div class="panel-toolbar">
+            <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>headinspect.ru/images/</span>
+          </div>
+          <div class="mini-report">
+            <div class="mini-top">
+              <div>
+                <span class="mini-label">Проверка завершена</span>
+                <strong>127 страниц</strong>
+              </div>
+              <span class="score">88%</span>
+            </div>
+            <div class="mini-stats">
+              <div class="mini-stat error"><b>5</b><span>ошибки</span></div>
+              <div class="mini-stat warning"><b>14</b><span>предупреждения</span></div>
+              <div class="mini-stat success"><b>108</b><span>OK</span></div>
+            </div>
+            <div class="mini-rows">
+              <div class="mini-row bad"><span>●</span><code>/catalog/</code><small>изображение 404</small></div>
+              <div class="mini-row warn"><span>●</span><code>/about/</code><small>нет alt у 3 картинок</small></div>
+              <div class="mini-row good"><span>●</span><code>/</code><small>изображения в порядке</small></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="cross-tools">
+      <div class="shell cross-tools-inner">
+        <div><strong>Переключайтесь между результатами аудита</strong><span>После общего аудита можно открывать другие модули без повторного сканирования сайта.</span></div>
+        <div class="cross-tool-links"><a href="/">Общий аудит</a><a href="/open-graph/">Open Graph</a><a href="/meta/">Meta</a><a href="/canonical/">Canonical</a><a href="/schema/">Schema</a><a href="/sitemap/">Sitemap</a></div>
+      </div>
+    </section>
+
+    <section id="audit-workspace" class="audit-workspace" hidden>
+      <div class="shell">
+        <div id="progress-card" class="progress-card">
+          <div class="section-kicker">АУДИТ</div>
+          <div class="progress-heading">
+            <div>
+              <h2>Проверяем <span id="audit-host">example.ru</span></h2>
+              <p>HeadInspect последовательно находит карту сайта и анализирует страницы.</p>
+            </div>
+            <strong id="progress-percent">0%</strong>
+          </div>
+
+          <div class="progress-track" aria-hidden="true">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+
+          <div class="progress-steps" aria-live="polite">
+            <div class="step" data-step="site"><span>○</span> Сайт доступен</div>
+            <div class="step" data-step="robots"><span>○</span> robots.txt найден</div>
+            <div class="step" data-step="sitemap"><span>○</span> sitemap найден</div>
+            <div class="step" data-step="urls"><span>○</span> найдено <b id="found-count">0</b> страниц</div>
+            <div class="step" data-step="scan"><span>○</span> проверено <b id="checked-count">0</b> из <b id="total-count">0</b></div>
+          </div>
+        </div>
+
+        <div id="results-card" class="results-card" hidden>
+          <div class="results-head">
+            <div>
+              <div class="section-kicker">РЕЗУЛЬТАТ</div>
+              <h2>Проверка завершена</h2>
+              <p><strong id="result-total">0</strong> страниц проверено<span id="result-unavailable-summary" hidden> · Не удалось проверить: <strong id="result-unavailable">0</strong></span></p>
+            </div>
+            <div class="results-actions">
+              <button id="download-btn" class="secondary-btn" type="button" title="Скачать отчёт в Excel">Скачать Excel</button>
+              <button id="restart-btn" class="ghost-btn" type="button">Проверить заново</button>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <button class="summary-card error active-filter" data-filter="error" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-errors">0</strong>
+              <small>Ошибки</small>
+            </button>
+            <button class="summary-card warning" data-filter="warning" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-warnings">0</strong>
+              <small>Предупреждения</small>
+            </button>
+            <button class="summary-card success" data-filter="success" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-ok">0</strong>
+              <small>OK</small>
+            </button>
+            <button class="summary-card all" data-filter="all" type="button">
+              <span class="status-dot"></span>
+              <strong id="count-all">0</strong>
+              <small>Все страницы</small>
+            </button>
+          </div>
+
+          <div class="table-toolbar">
+            <div class="filter-tabs" role="group" aria-label="Фильтр результатов">
+              <button class="filter-tab active" data-filter="problems" type="button">Проблемы <span id="tab-problems">0</span></button>
+              <button class="filter-tab" data-filter="error" type="button">Ошибки <span id="tab-errors">0</span></button>
+              <button class="filter-tab" data-filter="warning" type="button">Предупреждения <span id="tab-warnings">0</span></button>
+              <button class="filter-tab" data-filter="unavailable" type="button">Без ответа <span id="tab-unavailable">0</span></button>
+              <button class="filter-tab" data-filter="success" type="button">OK <span id="tab-ok">0</span></button>
+              <button class="filter-tab" data-filter="all" type="button">Все <span id="tab-all">0</span></button>
+            </div>
+            <div class="toolbar-note">Нажмите на строку, чтобы раскрыть список изображений</div>
+          </div>
+
+          <div id="result-list" class="result-list" aria-live="polite"></div>
+          <div id="empty-state" class="empty-state" hidden>По этому фильтру ничего не найдено.</div>
+          <button id="load-more-btn" class="load-more-btn" type="button" hidden>Показать ещё</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="content-section">
+      <div class="shell">
+        <div class="section-intro">
+          <div class="section-kicker">ВОЗМОЖНОСТИ</div>
+          <h2>Не один URL. <span>Весь сайт.</span></h2>
+          <p>
+            Images-модуль разбирает разметку изображений на каждой странице и проверяет
+            доступность картинок лёгкими HTTP-запросами — без скачивания самих файлов.
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="feature-num">01</span>
+            <h3>Атрибут alt</h3>
+            <p>Отсутствующий alt, пустой alt у декоративных изображений и слишком длинные описания.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">02</span>
+            <h3>Размеры в разметке</h3>
+            <p>Заданы ли width и height — чтобы браузер резервировал место и не было сдвигов вёрстки.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">03</span>
+            <h3>Lazy-loading</h3>
+            <p>loading="lazy" у первого (вероятно важного) изображения — его лучше загружать сразу.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">04</span>
+            <h3>srcset и &lt;picture&gt;</h3>
+            <p>Учитываются адаптивные источники: srcset у img и внутри &lt;picture&gt;/&lt;source&gt;.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">05</span>
+            <h3>Доступность</h3>
+            <p>HTTP-статус, Content-Type и вес по заголовкам — HEAD-запросом, без скачивания файла.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-num">06</span>
+            <h3>Повторное использование</h3>
+            <p>Одни и те же картинки на разных страницах видны сразу, с числом страниц.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="content-section alt">
+      <div class="shell">
+        <div class="section-intro narrow">
+          <div class="section-kicker">КАК ЭТО РАБОТАЕТ</div>
+          <h2>Четыре шага вместо ручной проверки каждой картинки</h2>
+        </div>
+
+        <ol class="steps-grid">
+          <li><span>1</span><div><h3>Введите сайт</h3><p>Достаточно адреса домена.</p></div></li>
+          <li><span>2</span><div><h3>Найдём sitemap</h3><p>Сначала robots.txt, затем карта сайта.</p></div></li>
+          <li><span>3</span><div><h3>Проверим изображения</h3><p>Разметка страниц и доступность картинок, до 500 URL за аудит.</p></div></li>
+          <li><span>4</span><div><h3>Исправьте проблемы</h3><p>Откройте нужную страницу или изображение прямо из отчёта.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="story-section">
+      <div class="shell story-card">
+        <div class="story-mark">“</div>
+        <div>
+          <div class="section-kicker">ЗАЧЕМ HEADINSPECT</div>
+          <h2>Битая или забытая без alt картинка легко теряется среди сотен страниц.</h2>
+          <p>
+            После переноса каталога или смены шаблона часть изображений может отдавать 404, остаться
+            без alt или грузиться лениво там, где это вредит. Images-модуль HeadInspect находит такие
+            места сразу по всему сайту — проверяя разметку и доступность, но не скачивая сами файлы.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="content-section">
+      <div class="shell">
+        <div class="section-intro narrow">
+          <div class="section-kicker">FAQ</div>
+          <h2>Частые вопросы</h2>
+        </div>
+
+        <div class="faq-list">
+          <details>
+            <summary>Что именно проверяет модуль изображений?</summary>
+            <p>Разметку &lt;img&gt; и адаптивные источники (srcset, &lt;picture&gt;/&lt;source&gt;): наличие и длину alt, атрибуты width/height, lazy-loading, предполагаемый формат по расширению URL, повторное использование картинок между страницами, а также доступность по HTTP (статус, Content-Type и вес по заголовкам).</p>
+          </details>
+          <details>
+            <summary>HeadInspect скачивает сами изображения?</summary>
+            <p>Нет. Доступность проверяется лёгким HTTP HEAD-запросом — скачиваются только заголовки ответа, но не содержимое файла. Поэтому реальные пиксельные размеры не измеряются; определяется только то, что видно из разметки и заголовков.</p>
+          </details>
+          <details>
+            <summary>Пустой alt — это ошибка?</summary>
+            <p>Нет. Пустой alt="" допустим для декоративных изображений и не считается проблемой. Предупреждение показывается, когда атрибут alt вообще отсутствует.</p>
+          </details>
+          <details>
+            <summary>Почему у некоторых картинок «не удалось определить»?</summary>
+            <p>Если сервер не поддерживает HEAD, не сообщает размер или ответ неоднозначен, HeadInspect честно пишет «не удалось определить», а не помечает изображение как недоступное.</p>
+          </details>
+          <details>
+            <summary>HeadInspect что-нибудь меняет на сайте?</summary>
+            <p>Нет. Аудит только читает публично доступные страницы и проверяет доступность изображений.</p>
+          </details>
+          <details>
+            <summary>Нужно ли регистрироваться?</summary>
+            <p>Нет. HeadInspect работает без регистрации и личного кабинета.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="bottom-cta">
+      <div class="shell bottom-cta-inner">
+        <div>
+          <div class="section-kicker">HEADINSPECT</div>
+          <h2>Проверьте изображения всего сайта.</h2>
+        </div>
+        <a class="primary-btn link-btn" href="#top">Проверить сайт</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="site-footer"></footer>
+<script src="/footer.js"></script>
+
+  <template id="detail-template">
+    <div class="detail-panel images-detail-panel">
+      <div class="detail-copy">
+        <div class="detail-title"></div>
+        <p class="images-summary"></p>
+        <div class="meta-list images-list"></div>
+        <div class="issue-box"></div>
+        <div class="detail-actions"></div>
+      </div>
+    </div>
+  </template>
+
+  <script src="/common.js"></script>
+  <script src="../images.js"></script>
+<script src="/consent.js"></script>
+</body>
+</html>

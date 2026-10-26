@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from fastapi import HTTPException
 
 from .analyzers.canonical import analyze_canonical
+from .analyzers.images import ImageAuditContext, analyze_images
 from .analyzers.meta import analyze_meta
 from .analyzers.open_graph import analyze_open_graph
 from .analyzers.schema import analyze_schema
@@ -61,6 +62,7 @@ async def analyze_page(
     semaphore: asyncio.Semaphore,
     *,
     stop_event: asyncio.Event | None = None,
+    image_ctx: ImageAuditContext | None = None,
 ) -> PageResult | None:
     if stop_event is not None and stop_event.is_set():
         # Cheap early exit for workers whose turn comes after mid-audit
@@ -97,7 +99,7 @@ async def analyze_page(
         # 30 с" now means exactly that: this page's own check ran for 30
         # seconds after it started and did not finish.
         try:
-            return await asyncio.wait_for(_fetch_and_analyze(url), timeout=PAGE_TIMEOUT)
+            return await asyncio.wait_for(_fetch_and_analyze(url, image_ctx), timeout=PAGE_TIMEOUT)
         except asyncio.TimeoutError:
             logger.warning("Page audit timed out after %.0fs: %s", PAGE_TIMEOUT, url)
             return PageResult(
@@ -110,7 +112,7 @@ async def analyze_page(
             )
 
 
-async def _fetch_and_analyze(url: str) -> PageResult:
+async def _fetch_and_analyze(url: str, image_ctx: ImageAuditContext | None = None) -> PageResult:
     """The actual per-page work: fetch, decide access_blocked/ordinary, run
     the content analyzers. Split out from analyze_page so PAGE_TIMEOUT can
     wrap *only* this - not the semaphore wait that precedes it."""
@@ -188,6 +190,7 @@ async def _fetch_and_analyze(url: str) -> PageResult:
     meta_data = analyze_meta(parser)
     schema_data = analyze_schema(parser.json_ld_blocks, parser.microdata_types)
     canonical_data = analyze_canonical(parser, result.headers, url, result.url)
+    images_data = await analyze_images(parser, result.url, image_ctx)
 
     return PageResult(
         url=result.url,
@@ -199,6 +202,7 @@ async def _fetch_and_analyze(url: str) -> PageResult:
         meta=meta_data,
         schema_data=schema_data,
         canonical=canonical_data,
+        images=images_data,
         errors=errors,
         warnings=warnings,
     )
@@ -285,6 +289,7 @@ async def run_pages(
     on_result: ProgressCallback,
     *,
     stop_event: asyncio.Event | None = None,
+    image_ctx: ImageAuditContext | None = None,
 ) -> None:
     # Bounded worker pool instead of one task per URL. Previously this created
     # len(urls) worker coroutines up front (up to MAX_AUDIT_URLS = 500) all
@@ -306,7 +311,7 @@ async def run_pages(
             if stop_event is not None and stop_event.is_set():
                 return
             url = pending.popleft()
-            result = await analyze_page(url, semaphore, stop_event=stop_event)
+            result = await analyze_page(url, semaphore, stop_event=stop_event, image_ctx=image_ctx)
             if result is None:
                 continue
             await on_result(result)

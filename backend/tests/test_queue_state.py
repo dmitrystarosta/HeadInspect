@@ -35,7 +35,7 @@ async def test_second_audit_is_queued_while_slot_held_then_runs_when_freed(monke
             "access_blocked_status": None,
         }
 
-    async def fake_run_pages(urls, on_result, *, stop_event=None):
+    async def fake_run_pages(urls, on_result, *, stop_event=None, image_ctx=None):
         return  # nothing to crawl -> completes immediately once past discovery
 
     monkeypatch.setattr(jobs_module, "discover_audit_urls", gated_discover)

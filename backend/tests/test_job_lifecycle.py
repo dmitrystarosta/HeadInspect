@@ -53,7 +53,7 @@ async def test_audit_timeout_with_partial_results_becomes_completed_partial(monk
             "access_blocked_status": None,
         }
 
-    async def fake_run_pages(urls, on_result, *, stop_event=None):
+    async def fake_run_pages(urls, on_result, *, stop_event=None, image_ctx=None):
         # Simulate checking a couple of pages quickly, then hanging well
         # past the crawl deadline (as a genuinely slow/unresponsive site would).
         await on_result(PageResult(url=urls[0], requested_url=urls[0], status_code=200))
@@ -117,7 +117,7 @@ async def test_single_blocked_page_does_not_stop_the_whole_audit(monkeypatch):
             "access_blocked_status": None,
         }
 
-    async def fake_run_pages(urls_, on_result, *, stop_event=None):
+    async def fake_run_pages(urls_, on_result, *, stop_event=None, image_ctx=None):
         for i, u in enumerate(urls_):
             # Mirrors what the real analyze_page (app/audit.py) now produces
             # for a 401/403/429 response: check_failed=True with
@@ -204,7 +204,7 @@ async def test_status_and_results_model_serialize_with_real_pydantic(monkeypatch
             "access_blocked_status": None,
         }
 
-    async def fake_run_pages(urls, on_result, *, stop_event=None):
+    async def fake_run_pages(urls, on_result, *, stop_event=None, image_ctx=None):
         await on_result(PageResult(url=urls[0], requested_url=urls[0], status_code=200))
         await on_result(PageResult(url=urls[1], requested_url=urls[1], status_code=403, errors=["HTTP 403"]))
         await asyncio.sleep(10)  # force crawl deadline -> completed_partial, with blocked_mid_audit still False here

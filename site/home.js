@@ -15,6 +15,7 @@ const submitBtn = form ? $('button[type="submit"]', form) : null;
 const { setStep, resetSteps } = createStepper("data-home-step");
 
 let pollAbortController = null;
+let currentJobId = null;
 
 function setSubmitting(value) {
   if (!submitBtn) return;
@@ -105,6 +106,15 @@ function moduleTotals(pages, moduleName) {
     }, { errors: 0, warnings: 0 });
   }
 
+  if (moduleName === "images") {
+    return pages.reduce((totals, page) => {
+      const images = page.images || {};
+      totals.errors += Array.isArray(images.errors) ? images.errors.length : 0;
+      totals.warnings += Array.isArray(images.warnings) ? images.warnings.length : 0;
+      return totals;
+    }, { errors: 0, warnings: 0 });
+  }
+
   if (moduleName === "sitemap") {
     return pages.reduce((totals, page) => {
       const statusCode = page.status_code;
@@ -160,9 +170,11 @@ function renderAuditModule(moduleName, pages, status, jobId) {
       ? `Schema.org проверена на ${successfullyChecked} страницах.`
       : moduleName === "canonical"
         ? `Canonical проверен на ${successfullyChecked} страницах.`
-        : moduleName === "sitemap"
-          ? `Sitemap проверен: ${successfullyChecked} URL.`
-          : `Open Graph проверен на ${successfullyChecked} страницах.`;
+        : moduleName === "images"
+          ? `Изображения проверены на ${successfullyChecked} страницах.`
+          : moduleName === "sitemap"
+            ? `Sitemap проверен: ${successfullyChecked} URL.`
+            : `Open Graph проверен на ${successfullyChecked} страницах.`;
 
   if (bodyText) {
     const unavailableText = failedChecks ? ` Не удалось проверить: ${failedChecks}. Эти страницы не считаются ошибками сайта.` : "";
@@ -178,9 +190,11 @@ function renderAuditModule(moduleName, pages, status, jobId) {
         ? "/schema/"
         : moduleName === "canonical"
           ? "/canonical/"
-          : moduleName === "sitemap"
-            ? "/sitemap/"
-            : "/open-graph/";
+          : moduleName === "images"
+            ? "/images/"
+            : moduleName === "sitemap"
+              ? "/sitemap/"
+              : "/open-graph/";
     link.href = `${basePath}?job=${encodeURIComponent(jobId)}&url=${encodeURIComponent(status.normalized_url)}`;
     link.textContent = moduleName === "meta"
       ? "Открыть подробный Meta-аудит"
@@ -188,9 +202,11 @@ function renderAuditModule(moduleName, pages, status, jobId) {
         ? "Открыть подробный Schema-аудит"
         : moduleName === "canonical"
           ? "Открыть подробный Canonical-аудит"
-          : moduleName === "sitemap"
-            ? "Открыть подробный Sitemap-аудит"
-            : "Открыть подробный Open Graph-аудит";
+          : moduleName === "images"
+            ? "Открыть подробный Images-аудит"
+            : moduleName === "sitemap"
+              ? "Открыть подробный Sitemap-аудит"
+              : "Открыть подробный Open Graph-аудит";
   }
 }
 
@@ -226,6 +242,7 @@ function renderHomeResult(status, results, jobId) {
   renderAuditModule("meta", pages, status, jobId);
   renderAuditModule("canonical", pages, status, jobId);
   renderAuditModule("schema", pages, status, jobId);
+  renderAuditModule("images", pages, status, jobId);
   renderAuditModule("sitemap", pages, status, jobId);
 
   progressCard.hidden = true;
@@ -235,6 +252,7 @@ function renderHomeResult(status, results, jobId) {
 }
 
 async function finishAudit(jobId, signal, { trackNormalizedUrl = false } = {}) {
+  currentJobId = jobId;
   let status;
   try {
     status = await pollJobUntilDone(jobId, {
@@ -359,8 +377,13 @@ form?.addEventListener("submit", async event => {
   }
 });
 
+$("#home-download-btn")?.addEventListener("click", event => {
+  HI.downloadReport(currentJobId, { button: event.currentTarget });
+});
+
 $("#home-restart-btn")?.addEventListener("click", () => {
   pollAbortController?.abort();
+  currentJobId = null;
   workspace.hidden = true;
   resultsCard.hidden = true;
   setHomeAuditUrl(null, null);

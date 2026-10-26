@@ -161,5 +161,44 @@ WARN_OG_IMAGE_BYTES = 1 * 1024 * 1024
 # Pillow decompression-bomb protection.
 MAX_IMAGE_PIXELS = 40_000_000
 
+# --- Images module -----------------------------------------------------------
+# The Images module analyses the page's already-fetched HTML markup (alt,
+# width/height, loading, srcset/<picture>, format guessed from the URL) and
+# checks availability of unique image URLs with lightweight HTTP HEAD requests
+# only - it NEVER downloads image bytes (no GET, not even as a fallback), never
+# runs Pillow on them and never stores them. These bounds protect the small VPS
+# and keep image work from degrading the page crawl or other modules.
+#
+# Max <img> records kept per page (markup level). A page with more images than
+# this is still counted honestly (ImagesData.truncated), but only this many
+# are recorded/checked - a pathological page cannot blow up memory or the
+# response for an audit of up to MAX_AUDIT_URLS pages.
+IMAGES_MAX_PER_PAGE = 60
+# Hard ceiling on how many *unique* image URLs one audit will HEAD-check in
+# total (across all its pages, after per-audit deduplication). Reached only by
+# very image-heavy sites; further unique URLs are recorded but left unchecked
+# and marked as such.
+IMAGES_MAX_UNIQUE_FETCH_PER_AUDIT = 400
+# Per-audit concurrency for image HEAD requests. Each HEAD still passes through
+# the process-wide _global_fetch_semaphore (the absolute cap), so this only
+# bounds how many image HEADs one audit runs at once. Kept at PAGE_CONCURRENCY:
+# an audit's page fetches (<=PAGE_CONCURRENCY) and its image HEADs
+# (<=this) together stay well under GLOBAL_MAX_CONCURRENT_FETCHES, so one audit
+# can never saturate the global pool on its own.
+IMAGES_HEAD_CONCURRENCY = 4
+# Overall time budget for one HEAD (connect+headers). Independent of, and
+# shorter than, PAGE_TIMEOUT so image checks can never push a page's own
+# fetch+analyze work past its liveness bound.
+IMAGES_HEAD_TIMEOUT = 8.0
+# Max wall-clock a single page will spend waiting on its images' availability
+# before giving up on the rest (they are reported as "не проверено, лимит
+# времени"). Well under PAGE_TIMEOUT so Images never turns a good page into a
+# timeout and never loses the other modules' results for that page.
+IMAGES_PAGE_BUDGET_SECONDS = 15.0
+# Content-Length above which an image is flagged as potentially too heavy.
+IMAGES_WARN_IMAGE_BYTES = 1 * 1024 * 1024
+# alt longer than this (characters) is flagged as overly long.
+IMAGES_ALT_MAX_LENGTH = 125
+
 # v0.3 still stores jobs in memory.
 JOB_TTL_SECONDS = 60 * 60

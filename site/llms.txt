@@ -12,6 +12,7 @@
 - [Проверка Meta](https://headinspect.ru/meta/): массовая проверка title, meta description, meta keywords, meta robots, viewport, lang, charset, длины значений и дублей между страницами.
 - [Проверка Canonical](https://headinspect.ru/canonical/): массовая проверка canonical URL, отсутствующих и множественных canonical, относительных и междоменных ссылок, canonical на другие страницы, редиректы, циклы, ошибки целевых URL и noindex.
 - [Проверка Schema.org и JSON-LD](https://headinspect.ru/schema/): массовая проверка JSON-LD, @context, @type и Microdata.
+- [Проверка изображений](https://headinspect.ru/images/): массовая проверка alt, атрибутов width/height, lazy-loading, srcset и <picture>, предполагаемого формата по URL, повторного использования картинок и доступности изображений (HTTP-статус, Content-Type, вес по заголовкам) через HEAD-запросы, без скачивания файлов.
 - [Проверка Sitemap](https://headinspect.ru/sitemap/): массовая проверка sitemap.xml, sitemap-index, URL карты сайта, HTTP-ошибок и редиректов.
 
 ## Документы
@@ -26,6 +27,7 @@
 - Один аудит сайта проверяет до 500 страниц.
 - HeadInspect анализирует только публично доступные данные страниц.
 - Сервис не изменяет проверяемые сайты.
+- Images-модуль проверяет доступность изображений только HEAD-запросами и не скачивает сами файлы.
 
 ## Контакты
 
@@ -34,9 +36,3 @@
 - [GitHub](https://github.com/dmitrystarosta/HeadInspect)
 - [Telegram](https://t.me/headinspect)
 - [ВКонтакте](https://vk.ru/headinspect)
-
-## Optional
-
-Инструменты в разработке. Страницы уже доступны и содержат описание, но сама проверка пока не запущена.
-
-- [Проверка изображений](https://headinspect.ru/images/): проверка изображений, alt, размеров и форматов (в разработке).

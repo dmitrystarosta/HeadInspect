@@ -307,7 +307,7 @@ async def test_stall_after_some_progress_keeps_partial(monkeypatch):
 
     from app.models import PageResult
 
-    async def fake_run_pages(urls, on_result, *, stop_event=None):
+    async def fake_run_pages(urls, on_result, *, stop_event=None, image_ctx=None):
         await on_result(PageResult(url=urls[0], requested_url=urls[0], status_code=200))
         await on_result(PageResult(url=urls[1], requested_url=urls[1], status_code=200))
         await asyncio.sleep(10)  # progress stops here

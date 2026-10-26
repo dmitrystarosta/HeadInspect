@@ -137,6 +137,49 @@ class CanonicalData(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class ImageItem(BaseModel):
+    # One <img> (or a srcset/<picture> candidate URL) on a page. Markup fields
+    # come from the already-fetched HTML; availability fields come from a HEAD
+    # request to the unique URL (never a GET - image bytes are never
+    # downloaded). All availability fields stay None when the URL was not or
+    # could not be checked.
+    src: str | None = None              # absolute/normalized URL when possible
+    raw_src: str | None = None          # as written in the HTML
+    source: Literal["img", "srcset"] = "img"  # where the URL came from
+    alt: str | None = None              # None => attribute absent
+    has_alt: bool = False
+    alt_empty: bool = False             # alt present but empty (decorative)
+    width_attr: str | None = None       # declared width attribute
+    height_attr: str | None = None      # declared height attribute
+    loading: str | None = None          # e.g. "lazy"
+    format_guess: str | None = None     # guessed from URL extension, may be None
+
+    # Availability (HEAD only).
+    checked: bool = False
+    accessible: bool | None = None
+    status_code: int | None = None
+    content_type: str | None = None
+    bytes: int | None = None            # from Content-Length, when provided
+    availability_note: str | None = None  # "не удалось определить" and why
+
+    reuse_count: int = 1                # on how many audited pages this URL appears
+
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ImagesData(BaseModel):
+    # Per-page Images result. `items` holds the per-image detail for the UI;
+    # `errors`/`warnings` are the flat aggregate lines (one per finding) the
+    # general audit counts, exactly like the other modules' data objects.
+    items: list[ImageItem] = Field(default_factory=list)
+    total: int = 0                      # <img> count on the page (pre-truncation)
+    truncated: bool = False             # more than IMAGES_MAX_PER_PAGE images
+    checked_count: int = 0              # unique URLs actually HEAD-checked
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 CheckFailureReason = Literal["network", "timeout", "content_type", "access_blocked"]
 
 
@@ -166,6 +209,7 @@ class PageResult(BaseModel):
     meta: MetaData = Field(default_factory=MetaData)
     schema_data: SchemaData = Field(default_factory=SchemaData, serialization_alias="schema")
     canonical: CanonicalData = Field(default_factory=CanonicalData)
+    images: ImagesData = Field(default_factory=ImagesData)
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

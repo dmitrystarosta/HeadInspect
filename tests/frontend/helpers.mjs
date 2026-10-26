@@ -102,6 +102,7 @@ export function makeEl(tag) {
     replaceChildren() {},
     cloneNode() { return makeEl(tag); },
     closest() { return null; },
+    click() {},
     scrollIntoView() {},
     querySelector(sel) { return queryAllDescendants(this, sel, [])[0] || null; },
     querySelectorAll(sel) { return queryAllDescendants(this, sel, []); },
